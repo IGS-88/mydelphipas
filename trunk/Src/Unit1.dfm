@@ -15,8 +15,8 @@ object Form1: TForm1
   PixelsPerInch = 96
   TextHeight = 13
   object img1: TImage
-    Left = 392
-    Top = 112
+    Left = 504
+    Top = 104
     Width = 345
     Height = 329
   end
@@ -27,9 +27,9 @@ object Form1: TForm1
     Height = 13
   end
   object mmo1: TMemo
-    Left = 40
+    Left = 16
     Top = 112
-    Width = 273
+    Width = 473
     Height = 313
     Lines.Strings = (
       'mmo1')
@@ -76,7 +76,6 @@ object Form1: TForm1
     Height = 33
     Caption = 'btn1'
     TabOrder = 5
-    OnClick = btn5Click
   end
   object Edit1: TEdit
     Left = 352

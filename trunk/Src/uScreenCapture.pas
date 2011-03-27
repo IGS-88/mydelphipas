@@ -2,10 +2,8 @@ unit uScreenCapture;
 
 interface
 uses
-  Windows, SysUtils, Classes, MyUtils, ScreenCapture, FFBaseComponent, FFEncode, uGUID, uLogger;
-
+  Windows, SysUtils, Classes, MyUtils, ScreenCapture, FFEncode, uGUID, uLogger;
 type
-
   {PProgressInfo = ^TProgressInfo;
   TProgressInfo = record
     TaskIndex: Integer;     // index of converting tasks
@@ -67,7 +65,7 @@ type
     FOnTerminate: TTerminateEvent;
     FOnInputVideoHook:  TVideoHookEvent;
     FOnOutputVideoHook: TVideoHookEvent;
-    FOnError: TErrorEvent;
+//    FOnError: TErrorEvent;
 
     procedure DoProgress(Sender: TObject; AProgressInfo: PProgressInfo);
     procedure DoTerminate(Sender: TObject; const ATerminateInfo: TTerminateInfo);
@@ -100,7 +98,7 @@ type
     property  PreviewBitmap: Boolean read ReadPreviewBitmap write SetPreviewBitmap;
     property  ProgressInterval: Integer read ReadProgressIntegerval write SetProgressIntegerval;
 
-    property  OnError: TErrorEvent read FOnError write FOnError;  //error 触发事件
+//    property  OnError: TErrorEvent read FOnError write FOnError;  //error 触发事件
     property  Encoder: TFFEncoder read FEncode;
     property  ID: string read FID;
     property  Status: TCaptureStatus read FStatus;
@@ -192,10 +190,11 @@ end;
 procedure TScreenCapture.DoError(ErrorMsg: string);
 begin
   FLastError := ErrorMsg;
-  if Assigned(FOnError) then
-  begin
-    FOnError(Self, FLastError);
-  end;
+//  if Assigned(FOnError) then
+//  begin
+//    FOnError(Self, FLastError);
+//  end;
+  WriteLog(GetCurrentThreadId, Self.ID, llerror, ErrorMsg);
 end;
 
 procedure TScreenCapture.DoPreviewBitmap(Sender: TObject;
@@ -272,7 +271,7 @@ end;
 
 function TScreenCapture.SetOutputOptins: Boolean;
 begin
-                                        { TODO : 初始化并设置 TOutputOption  FOO }
+  { TODO : 初始化并设置 TOutputOption  FOO }
 end;
 
 procedure TScreenCapture.SetPreviewBitmap(Value: Boolean);
@@ -310,13 +309,13 @@ begin
 
   if FOptionCaptions = EmptyStr then
   begin
-    DoError('***OptionCaption is Empty!');
+    DoError('OptionCaption is Empty!');
     Exit;
   end;
 
   if FOO.FileName = 'UnInit' then
   begin
-    DoError('***OutputOption is empty, please set OutputOption!');
+    DoError('OutputOption is empty, please set OutputOption!');
     Exit;
   end;
 
@@ -330,14 +329,14 @@ begin
   LIndex := FEncode.AddTask(FOptionCaptions, @FIO);
   if LIndex < 0 then
   begin
-    DoError('***File open error: ' + FEncode.LastErrMsg);
+    DoError('File open error: ' + FEncode.LastErrMsg);
     Exit;
   end;
 
   if not FEncode.SetOutputFile(LIndex, FOutFileName, @FOO) then
   begin
     FEncode.RemoveTask(LIndex);
-    DoError('***Cannot do convert, error: ' + FEncode.LastErrMsg);
+    DoError('Cannot do convert, error: ' + FEncode.LastErrMsg);
     Exit;
   end;
 
