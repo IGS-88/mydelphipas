@@ -36,6 +36,14 @@
  * Ported by CodeCoolie@CNSW 2009/08/31 -> $Date:: 2010-09-09 #$
  *)
 
+ (*
+  * Changed By Codeup@ 2011/3/17 -> *****
+  * Add things between '//============'
+  * Use PrintWindow API to capture the Windows behind foreground Windows.
+  * But PrintWindow API has some thread problems, uses this file carefully in thread.
+  * redirect logs to my logger which define in uLogger.pas.(undone)
+  *)
+
 unit ScreenCapture;
 
 interface
@@ -65,6 +73,7 @@ uses
   AVUtilStubs,
 
   FFUtils,
+  uLogger,
   MyUtils;
 
 const
@@ -640,6 +649,7 @@ begin
 
 //  pkt.pts := curtime;
 
+  //============================================================
   (* Blit screen grab *)
 //  if not BitBlt(s.window_hdc, 0, 0, s.width, s.height,
 //                s.source_hdc, s.x_off, s.y_off, SRCCOPY) then
@@ -649,16 +659,12 @@ begin
 //    Exit;
 //  end;
 
-  //============================================================
   if not PrintWindow(s.window_handle, s.Mem_hdc, 0) then
   begin
     av_log(s1, AV_LOG_ERROR, 'PrintWindow to Mem_hdc failed (error %li)'#10, GetLastError);
     Result := -1;
     Exit;
   end;
-//  frmScreenCapture.img1.Canvas.Lock;
-//  BitBlt(frmScreenCapture.img1.Canvas.Handle, 0,0, s.width, s.height, s.Mem_hdc, 0,0, SRCCOPY);
-//  frmScreenCapture.img1.Canvas.Unlock;
 
   if not BitBlt(s.window_hdc, 0, 0, s.width, s.height,
                 s.Mem_hdc, s.x_off, s.y_off, SRCCOPY) then

@@ -1,5 +1,7 @@
 program Project1;
 
+{%ToDo 'Project1.todo'}
+
 uses
   Forms,
   Unit1 in 'Unit1.pas' {Form1},
