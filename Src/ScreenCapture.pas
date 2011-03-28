@@ -371,8 +371,11 @@ begin
       else if SameText(N, 'cursor') then
         // capture cursor
         ctx.cursor := StrToIntDef(V, 1)
+//=========================================
       else if SameText(N, 'ParentGUID') then
+        // Parent GUID for log
         ctx.ParentGUID := V;
+//=========================================
     end;
   end;
 
@@ -382,7 +385,8 @@ begin
     ctx.source_hdc := GetWindowDC(ctx.window_handle);
   if ctx.source_hdc = 0 then
   begin
-    av_log(s, AV_LOG_ERROR, 'Couldn''t get window DC (error %li)'#10, GetLastError);
+//    av_log(s, AV_LOG_ERROR, 'Couldn''t get window DC (error %d)'#10, GetLastError);
+    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Couldn''t get window DC (error %d)'#10, [GetLastError]));
     Result := AVERROR_IO;
     Exit;
   end;
@@ -417,7 +421,8 @@ begin
 
   if (ctx.width < 0) or (ctx.height < 0) or (ctx.bpp mod 8 <> 0) then
   begin
-    av_log(s, AV_LOG_ERROR, 'Invalid properties, aborting'#10);
+//    av_log(s, AV_LOG_ERROR, 'Invalid properties, aborting'#10);
+    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, 'Invalid properties, aborting'#10);
     Result := AVERROR_IO;
     Exit;
   end;
@@ -425,16 +430,18 @@ begin
   ctx.window_hdc := CreateCompatibleDC(ctx.source_hdc);
   if ctx.window_hdc = 0 then
   begin
-    av_log(s, AV_LOG_ERROR, 'Screen DC CreateCompatibleDC (error %li)'#10, GetLastError);
+//    av_log(s, AV_LOG_ERROR, 'Screen DC CreateCompatibleDC (error %d)'#10, GetLastError);
+    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Screen DC CreateCompatibleDC (error %d)'#10, [GetLastError]));
     Result := AVERROR_IO;
     Exit;
   end;
-  
+
 //  ====================================================
   ctx.Mem_hdc := CreateCompatibleDC(ctx.source_hdc);
   if ctx.Mem_hdc = 0 then
   begin
-    av_log(s, AV_LOG_ERROR, 'Mem DC CreateCompatibleDC (error %li)'#10, GetLastError);
+//    av_log(s, AV_LOG_ERROR, 'Mem DC CreateCompatibleDC (error %d)'#10, GetLastError);
+    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Mem DC CreateCompatibleDC (error %d)'#10, [GetLastError]));
     Result := AVERROR_IO;
     Exit;
   end;
@@ -442,7 +449,8 @@ begin
   ctx.Hbmp_Mem := CreateCompatibleBitmap(ctx.source_hdc, screenwidth, screenheight);
   if ctx.Hbmp_Mem = 0 then
   begin
-    av_log(s, AV_LOG_ERROR, 'Mem DC CreateCompatibleBitmap (error %li)'#10, GetLastError);
+//    av_log(s, AV_LOG_ERROR, 'Mem DC CreateCompatibleBitmap (error %d)'#10, GetLastError);
+    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Mem DC CreateCompatibleBitmap (error %d)'#10, [GetLastError]));
     Result := AVERROR_IO;
     Exit;
   end;
@@ -451,7 +459,8 @@ begin
   ctx.hbmp := CreateCompatibleBitmap(ctx.source_hdc, ctx.width, ctx.height);
   if ctx.hbmp = 0 then
   begin
-    av_log(s, AV_LOG_ERROR, 'Screen DC CreateCompatibleBitmap (error %li)'#10, GetLastError);
+//    av_log(s, AV_LOG_ERROR, 'Screen DC CreateCompatibleBitmap (error %d)'#10, GetLastError);
+    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Screen DC CreateCompatibleBitmap (error %d)'#10, [GetLastError]));
     Result := AVERROR_IO;
     Exit;
   end;
@@ -464,7 +473,8 @@ begin
     if errcode <> 0 then
     begin
       errmsg := SysErrorMessage(errcode);
-      av_log(s, AV_LOG_ERROR, 'GetObject (error %li: %s)'#10, errcode, PAnsiChar(AnsiString(errmsg)));
+//      av_log(s, AV_LOG_ERROR, 'GetObject (error %d: %s)'#10, errcode, PAnsiChar(AnsiString(errmsg)));
+      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('GetObject (error %d: %s)'#10, [errcode, errmsg]));
       Result := AVERROR_IO;
       Exit;
     end
@@ -477,22 +487,33 @@ begin
       bmp.bmPlanes := 1;
       bmp.bmBitsPixel := ctx.bpp;
       bmp.bmBits := nil;
-      av_log(s, AV_LOG_WARNING,
-             'GetObject failed. Force Bitmap type %li, size %lix%lix%i, ' +
-             '%i planes of width %li bytes'#10,
-             bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
-             bmp.bmPlanes, bmp.bmWidthBytes);
+//      av_log(s, AV_LOG_WARNING,
+//             'GetObject failed. Force Bitmap type %d, size %dx%dx%u, ' +
+//             '%u planes of width %d bytes'#10,
+//             bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
+//             bmp.bmPlanes, bmp.bmWidthBytes);
+      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llWarning,
+               Format('GetObject failed. Force Bitmap type %d, size %dx%dx%u, ' +
+               '%u planes of width %d bytes'#10,
+               [bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
+               bmp.bmPlanes, bmp.bmWidthBytes]));
     end;
   end
   else
-    av_log(s, AV_LOG_DEBUG,
-           'Using Bitmap type %li, size %lix%lix%i, ' +
-           '%i planes of width %li bytes'#10,
-           bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
-           bmp.bmPlanes, bmp.bmWidthBytes);
+//    av_log(s, AV_LOG_DEBUG,
+//           'Using Bitmap type %d, size %dx%dx%u, ' +
+//           '%u planes of width %d bytes'#10,
+//           bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
+//           bmp.bmPlanes, bmp.bmWidthBytes);
+      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llDebug,
+               Format('Using Bitmap type %d, size %dx%dx%u, ' +
+               '%u planes of width %d bytes'#10,
+               [bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
+               bmp.bmPlanes, bmp.bmWidthBytes]));
   if SelectObject(ctx.window_hdc, ctx.hbmp) = 0 then
   begin
-    av_log(s, AV_LOG_ERROR, 'SelectObject (error %li)'#10, GetLastError);
+//    av_log(s, AV_LOG_ERROR, 'SelectObject (error %d)'#10, GetLastError);
+    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('SelectObject (error %d)'#10, [GetLastError]));
     Result := AVERROR_IO;
     Exit;
   end;
@@ -500,13 +521,19 @@ begin
 //  ===============================================
 (* Get info from the bitmap *)
   FillChar(Mem_bmp, sizeof(BITMAP), 0);
+  { TODO 1 :
+Problem !
+Exit here, I/O error
+Log inference if don't set OnLog then there is nothing error... }
   if GetObject(ctx.Hbmp_Mem, sizeof(BITMAP), @Mem_bmp) = 0 then
   begin
     errcode := GetLastError;
+    errcode := 0;
     if errcode <> 0 then
     begin
       errmsg := SysErrorMessage(errcode);
-      av_log(s, AV_LOG_ERROR, 'Mem GetObject (error %li: %s)'#10, errcode, PAnsiChar(AnsiString(errmsg)));
+//      av_log(s, AV_LOG_ERROR, 'Mem GetObject (error %d: %s)'#10, errcode, PAnsiChar(AnsiString(errmsg)));
+      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Mem GetObject (error %d: %s)'#10, [errcode, errmsg]));
       Result := AVERROR_IO;
       Exit;
     end
@@ -519,22 +546,33 @@ begin
       Mem_bmp.bmPlanes := 1;
       Mem_bmp.bmBitsPixel := ctx.bpp;
       Mem_bmp.bmBits := nil;
-      av_log(s, AV_LOG_WARNING,
-             'Mem GetObject failed. Force Bitmap type %li, size %lix%lix%i, ' +
-             '%i planes of width %li bytes'#10,
-             Mem_bmp.bmType, Mem_bmp.bmWidth, Mem_bmp.bmHeight, Mem_bmp.bmBitsPixel,
-             Mem_bmp.bmPlanes, Mem_bmp.bmWidthBytes);
+//      av_log(s, AV_LOG_WARNING,
+//             'Mem GetObject failed. Force Bitmap type %d, size %dx%dx%u, ' +
+//             '%u planes of width %d bytes'#10,
+//             Mem_bmp.bmType, Mem_bmp.bmWidth, Mem_bmp.bmHeight, Mem_bmp.bmBitsPixel,
+//             Mem_bmp.bmPlanes, Mem_bmp.bmWidthBytes);
+      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llWarning,
+               Format('Mem GetObject failed. Force Bitmap type %d, size %dx%dx%u, ' +
+               '%u planes of width %d bytes'#10,
+               [Mem_bmp.bmType, Mem_bmp.bmWidth, Mem_bmp.bmHeight, Mem_bmp.bmBitsPixel,
+               Mem_bmp.bmPlanes, Mem_bmp.bmWidthBytes]));
     end;
   end
   else
-    av_log(s, AV_LOG_DEBUG,
-           'Mem Using Bitmap type %li, size %lix%lix%i, ' +
-           '%i planes of width %li bytes'#10,
-           Mem_bmp.bmType, Mem_bmp.bmWidth, Mem_bmp.bmHeight, Mem_bmp.bmBitsPixel,
-           Mem_bmp.bmPlanes, Mem_bmp.bmWidthBytes);
+//    av_log(s, AV_LOG_DEBUG,
+//           'Mem Using Bitmap type %d, size %dx%dx%u, ' +
+//           '%u planes of width %d bytes'#10,
+//           Mem_bmp.bmType, Mem_bmp.bmWidth, Mem_bmp.bmHeight, Mem_bmp.bmBitsPixel,
+//           Mem_bmp.bmPlanes, Mem_bmp.bmWidthBytes);
+    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llDebug,
+             Format('Mem Using Bitmap type %d, size %dx%dx%u, ' +
+             '%u planes of width %d bytes'#10,
+              [Mem_bmp.bmType, Mem_bmp.bmWidth, Mem_bmp.bmHeight, Mem_bmp.bmBitsPixel,
+              Mem_bmp.bmPlanes, Mem_bmp.bmWidthBytes]));
   if SelectObject(ctx.Mem_hdc, ctx.Hbmp_Mem) = 0 then
   begin
-    av_log(s, AV_LOG_ERROR, 'Mem SelectObject (error %li)'#10, GetLastError);
+//    av_log(s, AV_LOG_ERROR, 'Mem SelectObject (error %d)'#10, GetLastError);
+    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llError, Format('Mem SelectObject (error %d)'#10, [GetLastError]));
     Result := AVERROR_IO;
     Exit;
   end;
@@ -546,7 +584,8 @@ begin
     24: input_pixfmt := PIX_FMT_BGR24;
     32: input_pixfmt := PIX_FMT_RGB32;
   else
-    av_log(s, AV_LOG_ERROR, 'image depth %i not supported ... aborting'#10, ctx.bpp);
+//    av_log(s, AV_LOG_ERROR, 'image depth %u not supported ... aborting'#10, ctx.bpp);
+    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llError, Format('image depth %u not supported ... aborting'#10, [ctx.bpp]));
     Result := -1;
     Exit;
   end;
@@ -564,7 +603,8 @@ begin
   begin
     ap.time_base.num := 1;
     ap.time_base.den := 15;
-    av_log(s, AV_LOG_INFO, 'frame rate assume as %d/%d.'#10, ap.time_base.num, ap.time_base.den);
+//    av_log(s, AV_LOG_INFO, 'frame rate assume as %d/%d.'#10, ap.time_base.num, ap.time_base.den);
+    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llInfo, Format('frame rate assume as %d/%d.'#10, [ap.time_base.num, ap.time_base.den]));
   end;
 
 //  if (s.show_frame <> 0) and (s.window_handle = 0) then
@@ -594,9 +634,11 @@ begin
   ctx.time_frame := Round(av_gettime / av_q2d(ap.time_base));
 
   if show_title then
-    av_log(s, AV_LOG_INFO, 'Found window %s, ', title);
-  av_log(s, AV_LOG_INFO, 'ready for capturing %ix%ix%i at (%i,%i)'#10,
-         ctx.width, ctx.height, ctx.bpp, ctx.x_off, ctx.y_off);
+//    av_log(s, AV_LOG_INFO, 'Found window %s, ', title);
+    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llInfo, Format('Found window %s, ', [title]));
+//  av_log(s, AV_LOG_INFO, 'ready for capturing %ux%ux%u at (%u,%u)'#10,
+//         ctx.width, ctx.height, ctx.bpp, ctx.x_off, ctx.y_off);
+  WriteLog(GetCurrentThreadId, ctx.ParentGUID, llInfo, Format('ready for capturing %ux%ux%u at (%u,%u)'#10, [ctx.width, ctx.height, ctx.bpp, ctx.x_off, ctx.y_off]));
 
   Result := 0;
 end;
@@ -654,14 +696,15 @@ begin
 //  if not BitBlt(s.window_hdc, 0, 0, s.width, s.height,
 //                s.source_hdc, s.x_off, s.y_off, SRCCOPY) then
 //  begin
-//    av_log(s1, AV_LOG_ERROR, 'Failed to capture image (error %li)'#10, GetLastError);
+//    av_log(s1, AV_LOG_ERROR, 'Failed to capture image (error %d)'#10, GetLastError);
 //    Result := -1;
 //    Exit;
 //  end;
 
   if not PrintWindow(s.window_handle, s.Mem_hdc, 0) then
   begin
-    av_log(s1, AV_LOG_ERROR, 'PrintWindow to Mem_hdc failed (error %li)'#10, GetLastError);
+//    av_log(s1, AV_LOG_ERROR, 'PrintWindow to Mem_hdc failed (error %d)'#10, GetLastError);
+    WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('PrintWindow to Mem_hdc failed (error %d)'#10, [GetLastError]));
     Result := -1;
     Exit;
   end;
@@ -669,7 +712,8 @@ begin
   if not BitBlt(s.window_hdc, 0, 0, s.width, s.height,
                 s.Mem_hdc, s.x_off, s.y_off, SRCCOPY) then
   begin
-    av_log(s1, AV_LOG_ERROR, 'Failed to BitBlt image (error %li)'#10, GetLastError);
+//    av_log(s1, AV_LOG_ERROR, 'Failed to BitBlt image (error %d)'#10, GetLastError);
+    WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('Failed to BitBlt image (error %d)'#10, [GetLastError]));
     Result := -1;
     Exit;
   end;
@@ -703,13 +747,14 @@ begin
                   ClientToScreen(s.window_handle, rect.TopLeft);
                   ClientToScreen(s.window_handle, rect.BottomRight);
                 end;
-                //av_log(s1, AV_LOG_DEBUG, 'Pos(%li,%li) . (%li,%li)'#10, x, y, x - rect.left, y - rect.top);
+                //av_log(s1, AV_LOG_DEBUG, 'Pos(%d,%d) . (%d,%d)'#10, x, y, x - rect.left, y - rect.top);
                 Dec(x, rect.left);
                 Dec(y, rect.top);
               end
               else
               begin
-                av_log(s1, AV_LOG_ERROR, 'Couldn''t draw icon: %li'#10, GetLastError);
+//                av_log(s1, AV_LOG_ERROR, 'Couldn''t draw icon: %d'#10, GetLastError);
+                WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('Couldn''t draw icon: %d'#10, [GetLastError]));
                 s.cursor := 0; // do not capture cursor any more
               end;
             end;
@@ -718,18 +763,21 @@ begin
             Dec(y, s.y_off);
             if not DrawIcon(s.window_hdc, x, y, icon) then
             begin
-              av_log(s1, AV_LOG_ERROR, 'Couldn''t draw icon: error %li'#10, GetLastError);
+//              av_log(s1, AV_LOG_ERROR, 'Couldn''t draw icon: error %d'#10, GetLastError);
+              WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('Couldn''t draw icon: error %d'#10, [GetLastError]));
               s.cursor := 0; // do not capture cursor any more
             end;
           end
           else if icon <> 0 then
           begin
-            av_log(s1, AV_LOG_ERROR, 'Couldn''t get icon info: error %li'#10, GetLastError);
+//            av_log(s1, AV_LOG_ERROR, 'Couldn''t get icon info: error %d'#10, GetLastError);
+            WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('Couldn''t get icon info: error %d'#10, [GetLastError]));
             s.cursor := 0; // do not capture cursor any more
           end
           else
           begin
-            av_log(s1, AV_LOG_ERROR, 'Couldn''t copy icon: error %li'#10, GetLastError);
+//            av_log(s1, AV_LOG_ERROR, 'Couldn''t copy icon: error %d'#10, GetLastError);
+            WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('Couldn''t copy icon: error %d'#10, [GetLastError]));
             s.cursor := 0; // do not capture cursor any more
           end;
         finally
@@ -740,7 +788,8 @@ begin
     end
     else
     begin
-      av_log(s1, AV_LOG_ERROR, 'Couldn''t get cursor info: error %li'#10, GetLastError);
+//      av_log(s1, AV_LOG_ERROR, 'Couldn''t get cursor info: error %d'#10, GetLastError);
+      WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('Couldn''t get cursor info: error %d'#10, [GetLastError]));
       s.cursor := 0; // do not capture cursor any more
     end;
   end;
@@ -748,7 +797,8 @@ begin
   (* Get bits *)
   if GetBitmapBits(s.hbmp, s.size, pkt.data) = 0 then
   begin
-    av_log(s1, AV_LOG_ERROR, 'GetBitmapBits failed (error %li)'#10, GetLastError);
+//    av_log(s1, AV_LOG_ERROR, 'GetBitmapBits failed (error %d)'#10, GetLastError);
+    WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('GetBitmapBits failed (error %d)'#10, [GetLastError]));
     Result := -1;
     Exit;
   end;

@@ -4,7 +4,7 @@ interface
 uses
   SyncObjs, SysUtils, Classes, uGUID;
 type
-  TLogLevel = (llinfo, llerror, llexception, llwarn);
+  TLogLevel = (llInfo, llError, llException, llWarning, llDebug);
   TLogInfo = record
     ThreadID: Cardinal;
     PntGUID: string;
@@ -15,7 +15,7 @@ type
   ELogger = class(Exception);
 
   { 实际使用的接口 }
-  function WriteLog(AThreadID: Cardinal;const APntGUID:string; ALogLevel: TLogLevel; const ALogMsg: string): Boolean;
+  function WriteLog(AThreadID: Cardinal;const APntGUID:string; ALogLevel: TLogLevel; const ALogMsg: string): Boolean;overload;
   procedure SetOnLogEvent(OnLog: TOnLogEvent);
   function GetOnLogEvent: TOnLogEvent;
 
@@ -37,7 +37,7 @@ TLogger = class(TObject)
     class function getInstance: TLogger;
 
     function writeLog(AThreadID: Cardinal;const APntGUID:string; ALogLevel: TLogLevel; const ALogMsg: string): Boolean;
-    property  OnLog: TOnLogEvent read ReadOnLog write SetOnLog;
+    property OnLog: TOnLogEvent read ReadOnLog write SetOnLog;
   end;
 var
   CS_create: TCriticalSection;
