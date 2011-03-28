@@ -70,7 +70,7 @@ end;
 
 procedure TForm1.OnLog(Sender: TObject; const ALogInfo: TLogInfo);
 begin
-  mmo1.Lines.Add('#'+inttostr(ALogInfo.ThreadID)+' PntGUID:'+ALogInfo.PntGUID+
+  mmo1.Lines.Add('#'+inttostr(ALogInfo.ThreadID)+{' PntGUID:'+ALogInfo.PntGUID+}
                  ' LogLevel:'+inttostr(ord(ALogInfo.LogLevel))+' LogMsg:'+ALogInfo.LogMsg);
 end;
 
