@@ -21,6 +21,8 @@ type
     procedure FormCreate(Sender: TObject);
     procedure btn1Click(Sender: TObject);
     procedure btn3Click(Sender: TObject);
+    procedure btn2Click(Sender: TObject);
+    procedure btn4Click(Sender: TObject);
   private
     { Private declarations }
     procedure OnLog(Sender: TObject; const ALogInfo: TLogInfo);
@@ -72,6 +74,16 @@ procedure TForm1.OnLog(Sender: TObject; const ALogInfo: TLogInfo);
 begin
   mmo1.Lines.Add('#'+inttostr(ALogInfo.ThreadID)+{' PntGUID:'+ALogInfo.PntGUID+}
                  ' LogLevel:'+inttostr(ord(ALogInfo.LogLevel))+' LogMsg:'+ALogInfo.LogMsg);
+end;
+
+procedure TForm1.btn2Click(Sender: TObject);
+begin
+  ScreenCapture.Pause;
+end;
+
+procedure TForm1.btn4Click(Sender: TObject);
+begin
+  ScreenCapture.Resume;
 end;
 
 end.

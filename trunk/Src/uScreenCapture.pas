@@ -104,7 +104,7 @@ type
     property  Status: TCaptureStatus read FStatus;
     property  LastError: string read FLastError;
 
-    function Start(OutPutFile: WideString): Boolean;
+    function  Start(OutPutFile: WideString): Boolean;
     procedure Pause;
     procedure Resume;
     procedure Stop;
@@ -194,7 +194,7 @@ begin
 //  begin
 //    FOnError(Self, FLastError);
 //  end;
-  WriteLog(GetCurrentThreadId, Self.ID, llerror, ErrorMsg);
+  WriteLog(GetCurrentThreadId, Self.ID, llerror, ErrorMsg+#10);
 end;
 
 procedure TScreenCapture.DoPreviewBitmap(Sender: TObject;
@@ -246,6 +246,7 @@ procedure TScreenCapture.Pause;
 begin
   FEncode.Pause;
   FStatus := csPaused;
+  WriteLog(GetCurrentThreadId, ID, llDebug, 'Capture Paused!'#10);
 end;
 
 function TScreenCapture.ReadPreviewBitmap: Boolean;
@@ -262,6 +263,7 @@ procedure TScreenCapture.Resume;
 begin
   FEncode.Resume;
   FStatus := csWorking;
+  WriteLog(GetCurrentThreadId, ID, llDebug, 'Capture Resume!'#10);
 end;
 
 procedure TScreenCapture.SetCaptureOptions(OptionCaption: String);
@@ -276,12 +278,14 @@ end;
 
 procedure TScreenCapture.SetPreviewBitmap(Value: Boolean);
 begin
+  FEncode.Preview := Value;
   FEncode.PreviewBitmap := Value;
 end;
 
 procedure TScreenCapture.SetProgressIntegerval(Value: Integer);
 begin
   FEncode.ProgressInterval := Value;
+  WriteLog(GetCurrentThreadId, ID, llDebug, 'Set ProgressIntegerval = '+ IntToStr(Value)+#10);
 end;
 
 function TScreenCapture.Start(OutPutFile: WideString): Boolean;
@@ -302,7 +306,7 @@ begin
       DoError(FEncode.LastErrMsg);
       Exit;
     end;
-
+    WriteLog(GetCurrentThreadId, ID, llDebug, 'Load AVLib, Path: '+ FLibAVPath);
     // register screen capture demuxer
     ScreenCapture.register_screencapture;
   end;
@@ -343,18 +347,21 @@ begin
   FEncode.Start(1);
   FStatus := csWorking;
   Result := True;
+  WriteLog(GetCurrentThreadId, ID, llDebug, 'Capture Start!'#10);
 end;
 
 procedure TScreenCapture.Stop;
 begin
   FEncode.Stop;
   FStatus := csStopped;
+  WriteLog(GetCurrentThreadId, ID, llDebug, 'Capture Stopped!'#10);
 end;
 
 procedure TScreenCapture.UseDefaultOO;
 begin
   InitOutputOptions(@FOO);
   FOO.VideoCodec := 'mpeg4';
+  WriteLog(GetCurrentThreadId, ID, llDebug, 'Use Default OutputOptions.'#10);
 end;
 
 end.

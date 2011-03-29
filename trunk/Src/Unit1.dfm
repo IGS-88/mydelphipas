@@ -51,6 +51,7 @@ object Form1: TForm1
     Height = 33
     Caption = 'Pause'
     TabOrder = 2
+    OnClick = btn2Click
   end
   object btn3: TButton
     Left = 240
@@ -68,6 +69,7 @@ object Form1: TForm1
     Height = 33
     Caption = 'Resume'
     TabOrder = 4
+    OnClick = btn4Click
   end
   object btn5: TButton
     Left = 344
@@ -85,7 +87,7 @@ object Form1: TForm1
     TabOrder = 6
     Text = 
       'offset=0,0;framesize=500,500;framerate=15/1;showframe=1;cursor=1' +
-      ';title='#24211
+      ';handle=0'
   end
   object FFLogger1: TFFLogger
     Left = 48
