@@ -4,7 +4,7 @@ ScreenCapture.pas
 	//  ===============================================
 (* Get info from the bitmap *)
   FillChar(Mem_bmp, sizeof(BITMAP), 0);
-  if GetObject(ctx.Hbmp_Mem, sizeof(BITMAP), @Mem_bmp) = 0 then
+  if GetObject(ctx.Hbmp_Mem, sizeof(BITMAP), @Mem_bmp) = 0 then 
   begin
     errcode := GetLastError;
     if errcode <> 0 then	//Here is the problem
