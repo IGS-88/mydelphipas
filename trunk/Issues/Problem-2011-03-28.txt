@@ -10,4 +10,4 @@ ScreenCapture.pas
     if errcode <> 0 then	//Here is the problem
   ......	
 	//  ===============================================
-	这里 GetObject 之后返回失败，通过GetLastError后得到的错误信息是5，拒绝访问。但是在原代码中有相同的设计代码。GetObject也是失败的，但是GetLastError后返回值为0，执行成功。不解！现在人为更改为errcode = 0。
+	这里 GetObject 之后返回失败，通过GetLastError后得到的错误信息是5，拒绝访问。但是在原代码中有相同的设计代码。GetObject也是 失败的，但是GetLastError后返回值为0，执行成功。不解！现在人为更改为errcode = 0。
