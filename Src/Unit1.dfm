@@ -1,6 +1,6 @@
 object Form1: TForm1
   Left = 351
-  Top = 368
+  Top = 211
   Width = 870
   Height = 640
   Caption = 'Form1'
@@ -104,6 +104,31 @@ object Form1: TForm1
     Width = 249
     Height = 21
     TabOrder = 8
+  end
+  object btn6: TButton
+    Left = 16
+    Top = 16
+    Width = 75
+    Height = 25
+    Caption = 'btn6'
+    TabOrder = 9
+    OnClick = btn6Click
+  end
+  object Listbox: TListBox
+    Left = 16
+    Top = 432
+    Width = 313
+    Height = 97
+    ItemHeight = 13
+    TabOrder = 10
+  end
+  object edtPid: TEdit
+    Left = 360
+    Top = 440
+    Width = 121
+    Height = 21
+    TabOrder = 11
+    Text = 'edtPid'
   end
   object FFLogger1: TFFLogger
     Left = 48

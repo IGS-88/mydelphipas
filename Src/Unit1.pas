@@ -4,7 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, uScreenCapture, FFBaseComponent, FFLog, StdCtrls, ExtCtrls, uLogger;
+  Dialogs, uScreenCapture, FFBaseComponent, FFLog, StdCtrls, ExtCtrls, uLogger,
+  WaveMaker, AudioCapture, AudioTask, MyUtils ,TlHelp32;
 
 type
   TForm1 = class(TForm)
@@ -20,12 +21,16 @@ type
     lbl1: TLabel;
     edt1: TEdit;
     edt2: TEdit;
+    btn6: TButton;
+    Listbox: TListBox;
+    edtPid: TEdit;
     procedure FormCreate(Sender: TObject);
     procedure btn1Click(Sender: TObject);
     procedure btn3Click(Sender: TObject);
     procedure btn2Click(Sender: TObject);
     procedure btn4Click(Sender: TObject);
     procedure btn5Click(Sender: TObject);
+    procedure btn6Click(Sender: TObject);
   private
     { Private declarations }
     procedure OnLog(Sender: TObject; const ALogInfo: TLogInfo);
@@ -39,6 +44,8 @@ var
   ScreenCapture1: TScreenCapture;
   ScreenCapture2: TScreenCapture;
   PID: Cardinal;
+//  Ac: TAudioCapture;
+
 implementation
 
 {$R *.dfm}
@@ -53,6 +60,9 @@ begin
   SetOnLogEvent(OnLog);
   Edit1.Text := 'offset=0,0;framesize=500,500;framerate=15/1;showframe=1;cursor=1;';
   edt2.Text := '百度与作家团体关键问题仍对峙 110328 北京您早 - 视频 - 优酷视频 - 在线观看 - Windows Internet Explorer';
+
+
+
 end;
 
 procedure TForm1.btn1Click(Sender: TObject);
@@ -63,11 +73,18 @@ begin
   ScreenCapture1.UseDefaultOO;
   if not ScreenCapture1.Start('ScreenCapture1.mp4') then
   ShowMessage('Error');
+
+  Ac.Start;
+
 end;
 
 procedure TForm1.btn3Click(Sender: TObject);
 begin
   ScreenCapture1.Stop;
+
+  Ac.Stop;
+  Ac.MakeAudioFile;
+  UninjectTarge(PID);
 end;
 
 procedure TForm1.OnPreviewBitmap(Sender: TObject;
@@ -99,9 +116,40 @@ var
   ProcessID: Cardinal;
 begin
   hwnd := FindWindow(nil, PAnsiChar(edt2.text));
-  GetWindowThreadProcessId(hwnd,@ProcessID);
-  PID := ProcessID;
+   GetWindowThreadProcessId(hwnd,@ProcessID);
+  PID := StrToInt(edtPid.Text);
   Edit1.Text := Edit1.Text + 'hwnd='+inttostr(hwnd);
+
+  Ac:= TAudioCapture.Create(PID,ExePath);
+  if not InjectTarge(PID) then
+  begin
+    ShowMessage('1');
+  end;
+  
+end;
+
+procedure TForm1.btn6Click(Sender: TObject);
+var
+  ProcessName : string; //进程名
+  ProcessID  : integer; //进程表示符
+  ContinueLoop:BOOL;
+  FSnapshotHandle:THandle; //进程快照句柄
+  FProcessEntry32:TProcessEntry32; //进程入口的结构体信息
+begin
+  Listbox.Clear;
+  FSnapshotHandle:=CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0); //创建一个进程快照
+  FProcessEntry32.dwSize:=Sizeof(FProcessEntry32);
+  ContinueLoop:=Process32First(FSnapshotHandle,FProcessEntry32); //得到系统中第一个进程
+  //循环例举
+  while ContinueLoop  do
+  begin
+    ProcessName := FProcessEntry32.szExeFile;
+    ProcessID := FProcessEntry32.th32ProcessID;
+    Listbox.Items.add('Name:'+ProcessName +'  #ID:'+ inttostr(ProcessID));
+    //Listbox.Items.add(inttostr(ProcessID));
+    ContinueLoop:=Process32Next(FSnapshotHandle,FProcessEntry32);
+  end;
+  CloseHandle(FSnapshotHandle);
 end;
 
 end.
