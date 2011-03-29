@@ -92,6 +92,7 @@ type
     Mem_hdc: HDC;           (* HDC in Memory, the same as window_hdc. PrintWindow to Mem_hdc *)//Add at 2011/3/17 by Codeup
     Hbmp_Mem: HBITMAP;      (* HBITMAP for Mem_hdc, PrintWindow WindowScreen to Mem_hdc, which selected with HBmp_Mem *)
     ParentGUID: string;     (* GUID of Parent TScreenCapture. Send this param to Log *)
+    isDesktop: Boolean;     (* Capture Desktop flag, default=False *)
     //=======================================================
     time_base: TAVRational; (* Time base *)
     time_frame: Int64;      (* Current time *)
@@ -373,11 +374,17 @@ begin
         ctx.cursor := StrToIntDef(V, 1)
 //=========================================
       else if SameText(N, 'ParentGUID') then
-        // Parent GUID for log
+        // Parent GUID for log              //Add for record the parent GUID
         ctx.ParentGUID := V;
 //=========================================
     end;
   end;
+//=========================================
+  if ctx.window_handle = 0 then
+    ctx.isDesktop := True                   //Add for diff Capture Desktop or Capture Window.
+  else
+    ctx.isDesktop := False;
+//=========================================
 
   if ctx.client <> 0 then
     ctx.source_hdc := GetDC(ctx.window_handle)
@@ -528,7 +535,7 @@ Log inference if don't set OnLog then there is nothing error... }
   if GetObject(ctx.Hbmp_Mem, sizeof(BITMAP), @Mem_bmp) = 0 then
   begin
     errcode := GetLastError;
-    errcode := 0;
+    errcode := 0;   //强制更改GetLastError的结果，不影响后续工作。
     if errcode <> 0 then
     begin
       errmsg := SysErrorMessage(errcode);
@@ -693,29 +700,33 @@ begin
 
   //============================================================
   (* Blit screen grab *)
-//  if not BitBlt(s.window_hdc, 0, 0, s.width, s.height,
-//                s.source_hdc, s.x_off, s.y_off, SRCCOPY) then
-//  begin
-//    av_log(s1, AV_LOG_ERROR, 'Failed to capture image (error %d)'#10, GetLastError);
-//    Result := -1;
-//    Exit;
-//  end;
-
-  if not PrintWindow(s.window_handle, s.Mem_hdc, 0) then
+  if s.isDesktop then      //Capture Desktop use DC directly
   begin
-//    av_log(s1, AV_LOG_ERROR, 'PrintWindow to Mem_hdc failed (error %d)'#10, GetLastError);
-    WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('PrintWindow to Mem_hdc failed (error %d)'#10, [GetLastError]));
-    Result := -1;
-    Exit;
-  end;
-
-  if not BitBlt(s.window_hdc, 0, 0, s.width, s.height,
-                s.Mem_hdc, s.x_off, s.y_off, SRCCOPY) then
+    if not BitBlt(s.window_hdc, 0, 0, s.width, s.height,
+                  s.source_hdc, s.x_off, s.y_off, SRCCOPY) then
+    begin
+      av_log(s1, AV_LOG_ERROR, 'Failed to capture image (error %d)'#10, GetLastError);
+      Result := -1;
+      Exit;
+    end;
+  end
+  else
   begin
-//    av_log(s1, AV_LOG_ERROR, 'Failed to BitBlt image (error %d)'#10, GetLastError);
-    WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('Failed to BitBlt image (error %d)'#10, [GetLastError]));
-    Result := -1;
-    Exit;
+    if not PrintWindow(s.window_handle, s.Mem_hdc, 0) then
+    begin
+  //    av_log(s1, AV_LOG_ERROR, 'PrintWindow to Mem_hdc failed (error %d)'#10, GetLastError);
+      WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('PrintWindow to Mem_hdc failed (error %d)'#10, [GetLastError]));
+      Result := -1;
+      Exit;
+    end;
+    if not BitBlt(s.window_hdc, 0, 0, s.width, s.height,
+                  s.Mem_hdc, s.x_off, s.y_off, SRCCOPY) then
+    begin
+  //    av_log(s1, AV_LOG_ERROR, 'Failed to BitBlt image (error %d)'#10, GetLastError);
+      WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('Failed to BitBlt image (error %d)'#10, [GetLastError]));
+      Result := -1;
+      Exit;
+    end;
   end;
   //============================================================
 

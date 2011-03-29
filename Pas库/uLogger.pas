@@ -4,7 +4,7 @@ interface
 uses
   SyncObjs, SysUtils, Classes, uGUID;
 type
-  TLogLevel = (llInfo, llError, llException, llWarning, llDebug);
+  TLogLevel = (llException, llError, llWarning, llInfo, llDebug);
   TLogInfo = record
     ThreadID: Cardinal;
     PntGUID: string;

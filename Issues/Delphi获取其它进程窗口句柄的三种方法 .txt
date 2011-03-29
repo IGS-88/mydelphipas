@@ -1,0 +1,99 @@
+Delphi获取其它进程窗口句柄的三种方法 
+
+本文主要跟大家介绍Delphi中获取其它进程的窗口句柄，在Delphi中获取其它进程的窗口句柄，绝大部分人首先想到的会使用：FindWindow或者用GetWindow来遍历查找，如：
+
+handle := FindWindow(nil,PChar('窗口的标题'));
+或者：
+procedure TForm1.Button1Click(Sender: TObject); 
+var 
+　　hCurrentWindow: HWnd; 
+　　WndText:String; 
+begin 
+　　hCurrentWindow := GetWindow(Handle, GW_HWNDFIRST); 
+　　while hCurrentWindow <> 0 do 
+　　begin 
+　　　　WndText:=GetWndText(hCurrentWindow); 
+　　　　if UpperCase(WndText)='窗口的标题' then begin 
+　　　　　　... 
+　　　　　　... 
+　　　　end; 
+　　　　hCurrentWindow:=GetWindow(hCurrentWindow, GW_HWNDNEXT); 
+　　end; 
+end; 
+
+
+因为目前网络上绝大部分的代码都是介绍用这两种方法取得其它进程的窗口句柄。虽这两种方法都可以达到查找其它进程的窗口句柄的目的，但本人认为这两都方法存在较大的弊端。因为这两种方法都是根据其它进程的标题来查找的，如果其它进程的标题在运行时不断的发生变化，那么这两种方法就无法没办法用了。
+
+
+今天给大家介绍第三种通过进程的文件名来查找窗口句柄。首先通过进程快照得到要查找的进程ID(ProcessId)，其次，再跟据ProcessId获取进程的窗口句柄。以下为本文章的代码：
+
+
+uses TLHelp32;
+
+procedure TForm1.Button1Click(Sender: TObject); 
+var
+ProcessName : string; //进程名
+FSnapshotHandle:THandle; //进程快照句柄
+FProcessEntry32:TProcessEntry32; //进程入口的结构体信息
+ContinueLoop:BOOL;
+MyHwnd:THandle;
+begin
+FSnapshotHandle:=CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0); //创建一个进程快照
+FProcessEntry32.dwSize:=Sizeof(FProcessEntry32);
+ContinueLoop:=Process32First(FSnapshotHandle,FProcessEntry32); //得到系统中第一个进程
+//循环例举 
+while ContinueLoop do 
+begin
+ProcessName := FProcessEntry32.szExeFile;
+
+if(ProcessName = '要找的应用程序名.exe') then begin
+MyHwnd := GetHWndByPID(FProcessEntry32.th32ProcessID);
+...
+
+...
+end;
+ContinueLoop:=Process32Next(FSnapshotHandle,FProcessEntry32);
+end;
+CloseHandle(FSnapshotHandle); // 释放快照句柄
+end;
+
+
+//跟据ProcessId获取进程的窗口句柄
+
+function TForm1.GetHWndByPID(const hPID: THandle): THandle;
+type
+PEnumInfo = ^TEnumInfo;
+TEnumInfo = record
+ProcessID: DWORD;
+HWND: THandle;
+end;
+
+function EnumWindowsProc(Wnd: DWORD; var EI: TEnumInfo): Bool; stdcall;
+var
+PID: DWORD;
+begin
+GetWindowThreadProcessID(Wnd, @PID);
+Result := (PID <> EI.ProcessID) or
+(not IsWindowVisible(WND)) or
+(not IsWindowEnabled(WND));
+
+if not Result then EI.HWND := WND; 
+end;
+
+function FindMainWindow(PID: DWORD): DWORD;
+var
+EI: TEnumInfo;
+begin
+EI.ProcessID := PID;
+EI.HWND := 0;
+EnumWindows(@EnumWindowsProc, Integer(@EI));
+Result := EI.HWND;
+end;
+begin
+if hPID<>0 then
+Result:=FindMainWindow(hPID)
+else
+Result:=0;
+end;
+
+作者：张国斌

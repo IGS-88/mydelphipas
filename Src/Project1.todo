@@ -1,1 +1,2 @@
-{TODO 1 : redirect Logs to my Logger in ScreenCapture.pas}
+{DONE : Capture Desktop, use the original functions BitBlt DC directly.}
+{DONE  : redirect Logs to my Logger in ScreenCapture.pas}
