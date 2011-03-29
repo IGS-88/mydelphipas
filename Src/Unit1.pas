@@ -18,11 +18,14 @@ type
     btn5: TButton;
     Edit1: TEdit;
     lbl1: TLabel;
+    edt1: TEdit;
+    edt2: TEdit;
     procedure FormCreate(Sender: TObject);
     procedure btn1Click(Sender: TObject);
     procedure btn3Click(Sender: TObject);
     procedure btn2Click(Sender: TObject);
     procedure btn4Click(Sender: TObject);
+    procedure btn5Click(Sender: TObject);
   private
     { Private declarations }
     procedure OnLog(Sender: TObject; const ALogInfo: TLogInfo);
@@ -33,7 +36,9 @@ type
 
 var
   Form1: TForm1;
-  ScreenCapture: TScreenCapture;
+  ScreenCapture1: TScreenCapture;
+  ScreenCapture2: TScreenCapture;
+  PID: Cardinal;
 implementation
 
 {$R *.dfm}
@@ -41,26 +46,28 @@ implementation
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   DoubleBuffered := True;
-  ScreenCapture := TScreenCapture.Create(Self);
-//  ScreenCapture.OnError := OnError;
-  ScreenCapture.OnPreviewBitmap := OnPreviewBitmap;
+  ScreenCapture1 := TScreenCapture.Create(Self);
+//  ScreenCapture1.OnError := OnError;
+  ScreenCapture1.OnPreviewBitmap := OnPreviewBitmap;
   mmo1.Lines.Add('Create ScreenCapture');
   SetOnLogEvent(OnLog);
+  Edit1.Text := 'offset=0,0;framesize=500,500;framerate=15/1;showframe=1;cursor=1;';
+  edt2.Text := '百度与作家团体关键问题仍对峙 110328 北京您早 - 视频 - 优酷视频 - 在线观看 - Windows Internet Explorer';
 end;
 
 procedure TForm1.btn1Click(Sender: TObject);
 begin
-  ScreenCapture.PreviewBitmap := True;
-  ScreenCapture.ProgressInterval := 100;
-  ScreenCapture.SetCaptureOptions(Edit1.Text);
-  ScreenCapture.UseDefaultOO;
-  if not ScreenCapture.Start('ScreenCapture.mp4') then
+  ScreenCapture1.PreviewBitmap := True;
+  ScreenCapture1.ProgressInterval := 100;
+  ScreenCapture1.SetCaptureOptions(Edit1.Text);
+  ScreenCapture1.UseDefaultOO;
+  if not ScreenCapture1.Start('ScreenCapture1.mp4') then
   ShowMessage('Error');
 end;
 
 procedure TForm1.btn3Click(Sender: TObject);
 begin
-  ScreenCapture.Stop;
+  ScreenCapture1.Stop;
 end;
 
 procedure TForm1.OnPreviewBitmap(Sender: TObject;
@@ -78,12 +85,23 @@ end;
 
 procedure TForm1.btn2Click(Sender: TObject);
 begin
-  ScreenCapture.Pause;
+  ScreenCapture1.Pause;
 end;
 
 procedure TForm1.btn4Click(Sender: TObject);
 begin
-  ScreenCapture.Resume;
+  ScreenCapture1.Resume;
+end;
+
+procedure TForm1.btn5Click(Sender: TObject);
+var
+  hwnd: Cardinal;
+  ProcessID: Cardinal;
+begin
+  hwnd := FindWindow(nil, PAnsiChar(edt2.text));
+  GetWindowThreadProcessId(hwnd,@ProcessID);
+  PID := ProcessID;
+  Edit1.Text := Edit1.Text + 'hwnd='+inttostr(hwnd);
 end;
 
 end.

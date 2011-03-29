@@ -1,6 +1,6 @@
 object Form1: TForm1
-  Left = 298
-  Top = 109
+  Left = 351
+  Top = 368
   Width = 870
   Height = 640
   Caption = 'Form1'
@@ -76,8 +76,9 @@ object Form1: TForm1
     Top = 8
     Width = 89
     Height = 33
-    Caption = 'btn1'
+    Caption = 'Add Handle'
     TabOrder = 5
+    OnClick = btn5Click
   end
   object Edit1: TEdit
     Left = 352
@@ -87,7 +88,22 @@ object Form1: TForm1
     TabOrder = 6
     Text = 
       'offset=0,0;framesize=500,500;framerate=15/1;showframe=1;cursor=1' +
-      ';handle=0'
+      ';'
+  end
+  object edt1: TEdit
+    Left = 448
+    Top = 16
+    Width = 105
+    Height = 21
+    TabOrder = 7
+    Text = 'CaptureScreen.mp4'
+  end
+  object edt2: TEdit
+    Left = 560
+    Top = 16
+    Width = 249
+    Height = 21
+    TabOrder = 8
   end
   object FFLogger1: TFFLogger
     Left = 48
