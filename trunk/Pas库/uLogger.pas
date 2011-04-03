@@ -9,13 +9,15 @@ type
     ThreadID: Cardinal;
     PntGUID: string;
     LogLevel: TLogLevel;
-    LogMsg: String
+    LogMsg: String;
+    LogPoint: Pointer;
   end;
   TOnLogEvent = procedure(Sender: TObject; const ALogInfo: TLogInfo) of object;
   ELogger = class(Exception);
 
   { 实际使用的接口 }
-  function WriteLog(AThreadID: Cardinal;const APntGUID:string; ALogLevel: TLogLevel; const ALogMsg: string): Boolean;overload;
+  function WriteLog(AThreadID: Cardinal; const APntGUID:string; ALogLevel: TLogLevel; const ALogMsg: string): Boolean;overload;
+  function WriteLog(AThreadID: Cardinal; ALogLevel: TLogLevel; const ALogMsg: string; const pt: Pointer): Boolean;overload;
   procedure SetOnLogEvent(OnLog: TOnLogEvent);
   function GetOnLogEvent: TOnLogEvent;
 
@@ -36,7 +38,7 @@ TLogger = class(TObject)
     destructor  destroy;override;
     class function getInstance: TLogger;
 
-    function writeLog(AThreadID: Cardinal;const APntGUID:string; ALogLevel: TLogLevel; const ALogMsg: string): Boolean;
+    function writeLog(AThreadID: Cardinal;const APntGUID:string; ALogLevel: TLogLevel; const ALogMsg: string; const Pt: Pointer): Boolean;
     property OnLog: TOnLogEvent read ReadOnLog write SetOnLog;
   end;
 var
@@ -46,7 +48,12 @@ var
 { 单元接口实现 }
 function WriteLog(AThreadID: Cardinal;const APntGUID:string; ALogLevel: TLogLevel; const ALogMsg: string): Boolean;
 begin
-  Result := TLogger.getInstance.writeLog(AThreadID, APntGUID, ALogLevel, ALogMsg);
+  Result := TLogger.getInstance.writeLog(AThreadID, APntGUID, ALogLevel, ALogMsg, nil);
+end;
+
+function WriteLog(AThreadID: Cardinal; ALogLevel: TLogLevel; const ALogMsg: string; const pt: Pointer): Boolean;
+begin
+  Result := TLogger.getInstance.writeLog(AThreadID, '', ALogLevel, ALogMsg, pt);
 end;
 
 procedure SetOnLogEvent(OnLog: TOnLogEvent);
@@ -102,7 +109,7 @@ begin
 end;
 
 function TLogger.writeLog(AThreadID: Cardinal; const APntGUID: string;
-  ALogLevel: TLogLevel; const ALogMsg: string): Boolean;
+  ALogLevel: TLogLevel; const ALogMsg: string; const Pt: Pointer): Boolean;
 begin
   with TLogger.getInstance do
   begin
@@ -113,6 +120,7 @@ begin
       PntGUID := APntGUID;
       LogLevel := ALogLevel;
       LogMsg := ALogMsg;
+      LogPoint := Pt;
     end;
     if Assigned(FOnLog) then
     begin
