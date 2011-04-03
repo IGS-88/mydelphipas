@@ -1,0 +1,2 @@
+del *.~pas
+del *.dcu

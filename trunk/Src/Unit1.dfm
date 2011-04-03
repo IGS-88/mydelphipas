@@ -130,8 +130,4 @@ object Form1: TForm1
     TabOrder = 11
     Text = 'edtPid'
   end
-  object FFLogger1: TFFLogger
-    Left = 48
-    Top = 40
-  end
 end

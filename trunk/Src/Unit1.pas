@@ -4,12 +4,11 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, uScreenCapture, FFBaseComponent, FFLog, StdCtrls, ExtCtrls, uLogger,
-  WaveMaker, AudioCapture, AudioTask, MyUtils ,TlHelp32;
+  Dialogs, uScreenCapture, StdCtrls, ExtCtrls, uLogger,
+  AudioCapture, AudioTask, MyUtils ,TlHelp32;
 
 type
   TForm1 = class(TForm)
-    FFLogger1: TFFLogger;
     mmo1: TMemo;
     img1: TImage;
     btn1: TButton;
@@ -33,7 +32,7 @@ type
     procedure btn6Click(Sender: TObject);
   private
     { Private declarations }
-    procedure OnLog(Sender: TObject; const ALogInfo: TLogInfo);
+    procedure OnLog(Sender: TObject; const ALogInfo: uLogger.TLogInfo);
     procedure OnPreviewBitmap(Sender: TObject; const APreviewInfo: TPreviewInfo);
   public
     { Public declarations }
