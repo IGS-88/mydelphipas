@@ -41,7 +41,9 @@
   * Add things between '//============'
   * Use PrintWindow API to capture the Windows behind foreground Windows.
   * But PrintWindow API has some thread problems, uses this file carefully in thread.
-  * redirect logs to my logger which define in uLogger.pas.(undone)
+  * redirect logs to my logger which define in uLogger.pas.
+  * Changed By Codeup@ 2011-04-05 -> 2011-04-05
+  * change isDesktop variable to UseDC, fix notes about options input.
   *)
 
 unit ScreenCapture;
@@ -92,7 +94,7 @@ type
     Mem_hdc: HDC;           (* HDC in Memory, the same as window_hdc. PrintWindow to Mem_hdc *)//Add at 2011/3/17 by Codeup
     Hbmp_Mem: HBITMAP;      (* HBITMAP for Mem_hdc, PrintWindow WindowScreen to Mem_hdc, which selected with HBmp_Mem *)
     ParentGUID: string;     (* GUID of Parent TScreenCapture. Send this param to Log *)
-    isDesktop: Boolean;     (* Capture Desktop flag, default=False *)
+    UseDC: Boolean;         (* Use GetDC instead PrintWindow, Default Value = False *)
     //=======================================================
     time_base: TAVRational; (* Time base *)
     time_frame: Int64;      (* Current time *)
@@ -319,6 +321,8 @@ begin
   //  showframe=1: show frame
   //  client=1: capture client dc instead of window dc
   //  cursor=1: grab cursor
+  //  usedc=true: capture window use bitblt DC
+  //  parentguid=string of guid, unique Object
   //  title=str: window caption, must be last option
 
   param := string(s.filename);
@@ -373,17 +377,17 @@ begin
         // capture cursor
         ctx.cursor := StrToIntDef(V, 1)
 //=========================================
-      else if SameText(N, 'ParentGUID') then
+      else if SameText(N, 'parentguid') then
         // Parent GUID for log              //Add for record the parent GUID
-        ctx.ParentGUID := V;
+        ctx.ParentGUID := V
+      else if SameText(N, 'usedc') then
+        ctx.UseDC := StrToBoolDef(V, False);
 //=========================================
     end;
   end;
 //=========================================
-  if ctx.window_handle = 0 then
-    ctx.isDesktop := True                   //Add for diff Capture Desktop or Capture Window.
-  else
-    ctx.isDesktop := False;
+  if (ctx.window_handle = 0) and (ctx.UseDC = False) then
+  ctx.UseDC := True;
 //=========================================
 
   if ctx.client <> 0 then
@@ -700,7 +704,7 @@ begin
 
   //============================================================
   (* Blit screen grab *)
-  if s.isDesktop then      //Capture Desktop use DC directly
+  if s.UseDC then      //Capture Desktop use DC directly
   begin
     if not BitBlt(s.window_hdc, 0, 0, s.width, s.height,
                   s.source_hdc, s.x_off, s.y_off, SRCCOPY) then

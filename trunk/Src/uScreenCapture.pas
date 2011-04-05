@@ -118,6 +118,7 @@ type
     //  showframe=1: show frame
     //  client=1: capture client dc instead of window dc
     //  cursor=1: grab cursor
+    //  usedc=true: capture window use bitblt DC
     //  title=str: window caption, must be last option
     procedure  SetCaptureOptions(OptionCaption: String);
 
