@@ -1,6 +1,6 @@
 object Form1: TForm1
-  Left = 390
-  Top = 99
+  Left = 344
+  Top = 89
   Width = 870
   Height = 640
   Caption = 'Form1'
@@ -107,7 +107,7 @@ object Form1: TForm1
   end
   object btn6: TButton
     Left = 16
-    Top = 16
+    Top = 8
     Width = 75
     Height = 25
     Caption = 'btn6'
@@ -128,6 +128,24 @@ object Form1: TForm1
     Width = 121
     Height = 21
     TabOrder = 11
-    Text = 'edtPid'
+    Text = '0'
+  end
+  object btn7: TButton
+    Left = 8
+    Top = 56
+    Width = 113
+    Height = 33
+    Caption = 'ScreenCapture2 start'
+    TabOrder = 12
+    OnClick = btn7Click
+  end
+  object actlst1: TActionList
+    Left = 808
+    Top = 64
+    object act_point: TAction
+      Caption = 'act_point'
+      ShortCut = 16496
+      OnExecute = act_pointExecute
+    end
   end
 end

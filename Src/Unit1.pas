@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, uScreenCapture, StdCtrls, ExtCtrls, uLogger,
-  AudioCapture, AudioTask, MyUtils ,TlHelp32;
+  AudioCapture, AudioTask, MyUtils ,TlHelp32, ActnList;
 
 type
   TForm1 = class(TForm)
@@ -23,6 +23,9 @@ type
     btn6: TButton;
     Listbox: TListBox;
     edtPid: TEdit;
+    btn7: TButton;
+    actlst1: TActionList;
+    act_point: TAction;
     procedure FormCreate(Sender: TObject);
     procedure btn1Click(Sender: TObject);
     procedure btn3Click(Sender: TObject);
@@ -30,6 +33,8 @@ type
     procedure btn4Click(Sender: TObject);
     procedure btn5Click(Sender: TObject);
     procedure btn6Click(Sender: TObject);
+    procedure btn7Click(Sender: TObject);
+    procedure act_pointExecute(Sender: TObject);
   private
     { Private declarations }
     procedure OnLog(Sender: TObject; const ALogInfo: uLogger.TLogInfo);
@@ -57,7 +62,7 @@ begin
   ScreenCapture1.OnPreviewBitmap := OnPreviewBitmap;
   mmo1.Lines.Add('Create ScreenCapture');
   SetOnLogEvent(OnLog);
-  Edit1.Text := 'offset=0,0;framesize=500,500;framerate=15/1;showframe=1;cursor=1;';
+  Edit1.Text := 'offset=0,0;framesize=500,500;framerate=15/1;showframe=1;cursor=1;usedc=true;';
   edt2.Text := '百度与作家团体关键问题仍对峙 110328 北京您早 - 视频 - 优酷视频 - 在线观看 - Windows Internet Explorer';
 
 
@@ -73,17 +78,18 @@ begin
   if not ScreenCapture1.Start('ScreenCapture1.mp4') then
   ShowMessage('Error');
 
-  Ac.Start;
+//  Ac.Start;
 
 end;
 
 procedure TForm1.btn3Click(Sender: TObject);
 begin
   ScreenCapture1.Stop;
+  ScreenCapture2.Stop;
 
-  Ac.Stop;
-  Ac.MakeAudioFile;
-  UninjectTarge(PID);
+//  Ac.Stop;
+//  Ac.MakeAudioFile;
+//  UninjectTarge(PID);
 end;
 
 procedure TForm1.OnPreviewBitmap(Sender: TObject;
@@ -149,6 +155,27 @@ begin
     ContinueLoop:=Process32Next(FSnapshotHandle,FProcessEntry32);
   end;
   CloseHandle(FSnapshotHandle);
+end;
+
+procedure TForm1.btn7Click(Sender: TObject);
+begin
+  ScreenCapture2 := TScreenCapture.Create(Self);
+  ScreenCapture2.SetCaptureOptions(Edit1.Text);
+  ScreenCapture2.UseDefaultOO;
+  if not ScreenCapture2.Start('ScreenCapture2.mp4') then
+  begin
+    ShowMessage('Second Error');
+  end;
+end;
+
+procedure TForm1.act_pointExecute(Sender: TObject);
+var
+  pos: TPoint;
+  hd: HWND;
+begin
+  GetCursorPos(pos);
+  hd := WindowFromPoint(pos);
+  ShowMessage(IntToStr(hd));
 end;
 
 end.
