@@ -8,7 +8,8 @@ uses
   uScreenCapture in 'uScreenCapture.pas',
   WaveMaker in 'WaveMaker.pas',
   AudioCapture in 'AudioCapture.pas',
-  AudioTask in 'AudioTask.pas';
+  AudioTask in 'AudioTask.pas',
+  uMerger in 'uMerger.pas';
 
 {$R *.res}
 
