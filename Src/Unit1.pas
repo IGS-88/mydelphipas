@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, uScreenCapture, StdCtrls, ExtCtrls, uLogger,
+  Dialogs, uScreenCapture, StdCtrls, ExtCtrls, uLogger, uMerger,
   AudioCapture, AudioTask, MyUtils ,TlHelp32, ActnList;
 
 type
@@ -26,6 +26,11 @@ type
     btn7: TButton;
     actlst1: TActionList;
     act_point: TAction;
+    btn8: TButton;
+    edt3: TEdit;
+    edt4: TEdit;
+    edt5: TEdit;
+    btn9: TButton;
     procedure FormCreate(Sender: TObject);
     procedure btn1Click(Sender: TObject);
     procedure btn3Click(Sender: TObject);
@@ -35,6 +40,8 @@ type
     procedure btn6Click(Sender: TObject);
     procedure btn7Click(Sender: TObject);
     procedure act_pointExecute(Sender: TObject);
+    procedure btn8Click(Sender: TObject);
+    procedure btn9Click(Sender: TObject);
   private
     { Private declarations }
     procedure OnLog(Sender: TObject; const ALogInfo: uLogger.TLogInfo);
@@ -49,6 +56,7 @@ var
   ScreenCapture2: TScreenCapture;
   PID: Cardinal;
 //  Ac: TAudioCapture;
+  Merger: TMerger;
 
 implementation
 
@@ -64,8 +72,6 @@ begin
   SetOnLogEvent(OnLog);
   Edit1.Text := 'offset=0,0;framesize=500,500;framerate=15/1;showframe=1;cursor=1;usedc=true;';
   edt2.Text := '百度与作家团体关键问题仍对峙 110328 北京您早 - 视频 - 优酷视频 - 在线观看 - Windows Internet Explorer';
-
-
 
 end;
 
@@ -85,6 +91,7 @@ end;
 procedure TForm1.btn3Click(Sender: TObject);
 begin
   ScreenCapture1.Stop;
+  if Assigned(ScreenCapture2) then
   ScreenCapture2.Stop;
 
 //  Ac.Stop;
@@ -176,6 +183,24 @@ begin
   GetCursorPos(pos);
   hd := WindowFromPoint(pos);
   ShowMessage(IntToStr(hd));
+end;
+
+procedure TForm1.btn8Click(Sender: TObject);
+begin
+  if not Assigned(Merger) then
+    Merger := TMerger.Create(Self);
+  Merger.AddVideo(edt3.Text);
+  Merger.AddAudio(edt4.Text);
+  Merger.UseDefaultOO;
+  Merger.Start(edt5.Text);
+end;
+
+procedure TForm1.btn9Click(Sender: TObject);
+begin
+  if not Assigned(Merger) then
+    Merger := TMerger.Create(Self);
+  Merger.VideoStreamID := Merger.GetFirstVideoStream(edt3.Text);
+  Merger.AudioStreamID := Merger.GetFirstAudioStream(edt4.Text);
 end;
 
 end.

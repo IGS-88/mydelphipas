@@ -1,6 +1,6 @@
 object Form1: TForm1
-  Left = 344
-  Top = 89
+  Left = 227
+  Top = 165
   Width = 870
   Height = 640
   Caption = 'Form1'
@@ -138,6 +138,48 @@ object Form1: TForm1
     Caption = 'ScreenCapture2 start'
     TabOrder = 12
     OnClick = btn7Click
+  end
+  object btn8: TButton
+    Left = 360
+    Top = 496
+    Width = 75
+    Height = 25
+    Caption = 'Merger'
+    TabOrder = 13
+    OnClick = btn8Click
+  end
+  object edt3: TEdit
+    Left = 464
+    Top = 496
+    Width = 105
+    Height = 21
+    TabOrder = 14
+    Text = 'E:\'#26032#24314#25991#20214#22841'\ScreenCapture1.mp4'
+  end
+  object edt4: TEdit
+    Left = 600
+    Top = 496
+    Width = 97
+    Height = 21
+    TabOrder = 15
+    Text = 'E:\'#26032#24314#25991#20214#22841'\372_70568024.wav'
+  end
+  object edt5: TEdit
+    Left = 712
+    Top = 496
+    Width = 121
+    Height = 21
+    TabOrder = 16
+    Text = 'E:\'#26032#24314#25991#20214#22841'\Merger.mp4'
+  end
+  object btn9: TButton
+    Left = 360
+    Top = 536
+    Width = 75
+    Height = 25
+    Caption = 'GetStreamIndex'
+    TabOrder = 17
+    OnClick = btn9Click
   end
   object actlst1: TActionList
     Left = 808

@@ -1,3 +1,16 @@
+{*******************************************************}
+{                                                       }
+{       Logger                                          }
+{                                                       }
+{       版权所有 (C) 2011 Codeup                        }
+{                                                       }
+{*******************************************************}
+
+(*
+ *  使用单例模式制作的Logger，唯一实例，使用时只需要引用本单元，然后调用实际使用的接口，
+ *  不需要手动创建任何实例。使用SetOnLogEvent关联Log事件。
+ *  2011-04-08 Add 添加注释说明
+ *)
 unit uLogger;
 
 interface
@@ -13,7 +26,7 @@ type
     LogPoint: Pointer;
   end;
   TOnLogEvent = procedure(Sender: TObject; const ALogInfo: TLogInfo) of object;
-  ELogger = class(Exception);
+  ELogger = class(Exception); //创建实例异常
 
   { 实际使用的接口 }
   function WriteLog(AThreadID: Cardinal; const APntGUID:string; ALogLevel: TLogLevel; const ALogMsg: string): Boolean;overload;
@@ -22,28 +35,29 @@ type
   function GetOnLogEvent: TOnLogEvent;
 
 implementation
-type
-TLogger = class(TObject)
-  private
-    FLogInfo: TLogInfo;
 
-    FOnLog: TOnLogEvent;
+type
+  { Logger类，实现Log操作，实例由getInstance首次调用创建 外界不需要访问 }
+  TLogger = class(TObject)
+  private
+    FLogInfo: TLogInfo;   //日志信息实例
+    FOnLog: TOnLogEvent;  //日志记录事件
     procedure SetOnLog(value: TOnLogEvent);
     function  ReadOnLog: TOnLogEvent;
-    class function createInstance: TLogger;
+    class function createInstance: TLogger; //类方法，创建唯一实例
   protected
   public
-    ID: string;
+    ID: string; //GUID
     constructor create;
     destructor  destroy;override;
-    class function getInstance: TLogger;
-
+    class function getInstance: TLogger;  //获取TLogger的唯一实例，首次调用时创建此实例
     function writeLog(AThreadID: Cardinal;const APntGUID:string; ALogLevel: TLogLevel; const ALogMsg: string; const Pt: Pointer): Boolean;
     property OnLog: TOnLogEvent read ReadOnLog write SetOnLog;
   end;
+
 var
-  CS_create: TCriticalSection;
-  CS_write: TCriticalSection;
+  CS_create: TCriticalSection; //实例创建临界区
+  CS_write: TCriticalSection;  //Log记录临界区
 
 { 单元接口实现 }
 function WriteLog(AThreadID: Cardinal;const APntGUID:string; ALogLevel: TLogLevel; const ALogMsg: string): Boolean;
