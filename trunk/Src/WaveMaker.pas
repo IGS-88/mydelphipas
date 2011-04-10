@@ -11,13 +11,16 @@ type
     TargetPid: DWORD;               //目标Pid
     TargetHWaveOut : Integer;        //目标设备句柄
     OutPutPath: string;                //输出地址  无后缀
+    StartTime: TDateTime;              //记录开始写数据的时间
 
     WavFormate: tWAVEFORMATEX;           //wav格式
     WaveDataSize: Integer;               //wav数据大小
 
-    StateRecording: Boolean;            //录制标记
+    StateStart: Boolean;                //开始标记 1: 已经开始写入数据 temp文件已生成
+    StateRecording: Boolean;            //录制标记  1：可写入数据
     StateFormateReady: Boolean;            //格式标记
     StateWriting: Boolean;              //写标记
+    StateMerge: Boolean;
     tempFileData : TFileStream;
 
   public
@@ -26,17 +29,24 @@ type
     procedure WriteTempData(Buf: pointer; Len: dword);//写数据
     procedure SetWavFormate(WHead: tWAVEFORMATEX);   //设置格式
     procedure SetWavInfo(nSamplesPerSec: DWORD; nChannels: Word; wBitsPerSample: Word);
+    procedure setMerge(b : Boolean); // 设置是否参与合成
 
+    function IsStart(): Boolean;   //验证是否已开始 temp文件已生成
     function IsRecording(): Boolean;   //验证是否录制
     function IsFormateReady(): Boolean;   //验证
+    function IsMerge(): Boolean;   //是否参与合成
+    
+
     function GetWavFormate(var nSamplesPerSec: DWORD; var nChannels: Word; var wBitsPerSample: Word): Boolean;  //验证格式信息 并且返回
     function GetHWaveOut(): Integer;
+    function GetWaveDataSize(): Integer;
+    function GetStartTime(): TDateTime;
 
     procedure SetOutPutInfo(Path :string ; Pid : DWORD; HWaveOut : Integer); //设置输出信息
 
-    procedure Start;   //将建立temp文件
+    procedure Start;   //将建立temp文件  stateRecording为1 首次调用WriteTempData是自动调用
     procedure Pause;
-    procedure Continue;
+    procedure Recording;
     procedure Stop;      //将关闭temp文件
     function MakeAudioFile(): Boolean;  //生成wav
     procedure DeleteTemp();
@@ -48,6 +58,11 @@ implementation
 
 procedure TWaveMaker.WriteTempData(Buf: pointer; Len: dword);
 begin
+  if not StateStart then
+  begin
+    Start;
+    StartTime:= Now;
+  end;  
   StateWriting:= True;
   WaveDataSize:= WaveDataSize + tempFileData.Write(Buf^ ,Len);
   StateWriting:= False;
@@ -74,6 +89,11 @@ begin
   StateFormateReady:= True;
 end;
 
+function TWaveMaker.IsStart(): Boolean;
+begin
+  Result:= StateStart;
+end;
+
 function TWaveMaker.IsRecording(): Boolean;
 begin
   Result:= StateRecording;
@@ -82,6 +102,11 @@ end;
 function TWaveMaker.IsFormateReady(): Boolean;
 begin
   Result:= StateFormateReady;
+end;
+
+function TWaveMaker.IsMerge: Boolean;
+begin
+  Result:= StateMerge;
 end;
 
 function TWaveMaker.GetWavFormate(var nSamplesPerSec: DWORD; var nChannels: Word; var wBitsPerSample: Word): Boolean;
@@ -105,23 +130,20 @@ begin
   tempFileData := TFileStream.Create(OutPutPath+'.wavtemp', fmCreate);
   tempFileData.Seek(44,soFromBeginning);
 
-  StateRecording:= True;
+  StateStart:= True;
   StateWriting:= False;
-
   WaveDataSize:= 0;
 
 end;
 
 procedure TWaveMaker.Pause;
 begin
-
   while StateWriting do ;
   StateRecording:= False;
 end;
 
-procedure TWaveMaker.Continue;
+procedure TWaveMaker.Recording;
 begin
-
   StateRecording:= True;
 end;
 
@@ -129,6 +151,8 @@ procedure TWaveMaker.Stop;
 begin
   while StateWriting do ;
   StateRecording:= False;
+  StateStart:= False;
+  StateMerge:= True;
   FreeAndNil(tempFileData);
 end;
 
@@ -199,9 +223,11 @@ begin
 
   SetOutPutInfo(Path , Pid , HWaveOut);
 
+  StateStart:= False;
   StateRecording:= False;
   StateWriting:= False;
   StateFormateReady:= False;
+  StateMerge:= False;
   WaveDataSize:= 0;
 end;
 
@@ -209,6 +235,22 @@ end;
 function TWaveMaker.GetHWaveOut: Integer;
 begin
 Result:= TargetHWaveOut;
+end;
+
+function TWaveMaker.GetWaveDataSize: Integer;
+begin
+Result:= WaveDataSize;
+end;
+
+function TWaveMaker.GetStartTime: TDateTime;
+begin
+  Result:= StartTime;
+end;
+
+
+procedure TWaveMaker.setMerge(b: Boolean);
+begin
+  StateMerge:= b;
 end;
 
 end.

@@ -54,8 +54,8 @@ var
   Form1: TForm1;
   ScreenCapture1: TScreenCapture;
   ScreenCapture2: TScreenCapture;
-  PID: Cardinal;
-//  Ac: TAudioCapture;
+  TargetPID: Cardinal= 0;
+
   Merger: TMerger;
 
 implementation
@@ -73,6 +73,8 @@ begin
   Edit1.Text := 'offset=0,0;framesize=500,500;framerate=15/1;showframe=1;cursor=1;usedc=true;';
   edt2.Text := '百度与作家团体关键问题仍对峙 110328 北京您早 - 视频 - 优酷视频 - 在线观看 - Windows Internet Explorer';
 
+  CreateAudioTasks();
+
 end;
 
 procedure TForm1.btn1Click(Sender: TObject);
@@ -84,7 +86,7 @@ begin
   if not ScreenCapture1.Start('ScreenCapture1.mp4') then
   ShowMessage('Error');
 
-//  Ac.Start;
+  StartTask(TargetPID);
 
 end;
 
@@ -94,9 +96,8 @@ begin
   if Assigned(ScreenCapture2) then
   ScreenCapture2.Stop;
 
-//  Ac.Stop;
-//  Ac.MakeAudioFile;
-//  UninjectTarge(PID);
+  StopTask(TargetPID);
+  MakeWavAsOne(TargetPID);
 end;
 
 procedure TForm1.OnPreviewBitmap(Sender: TObject;
@@ -115,29 +116,29 @@ end;
 procedure TForm1.btn2Click(Sender: TObject);
 begin
   ScreenCapture1.Pause;
+  PauseTask(TargetPID);
 end;
 
 procedure TForm1.btn4Click(Sender: TObject);
 begin
   ScreenCapture1.Resume;
+  ContinueTask(TargetPID);
 end;
 
 procedure TForm1.btn5Click(Sender: TObject);
 var
   hwnd: Cardinal;
   ProcessID: Cardinal;
+  pa: string;
 begin
   hwnd := FindWindow(nil, PAnsiChar(edt2.text));
    GetWindowThreadProcessId(hwnd,@ProcessID);
-  PID := StrToInt(edtPid.Text);
+  TargetPID := StrToInt(edtPid.Text);
   Edit1.Text := Edit1.Text + 'hwnd='+inttostr(hwnd);
 
-  Ac:= TAudioCapture.Create(PID,ExePath);
-  if not InjectTarge(PID) then
-  begin
-    ShowMessage('1');
-  end;
-  
+  pa:= ExePath;
+  AddTask(TargetPID, ExePath, Self);
+
 end;
 
 procedure TForm1.btn6Click(Sender: TObject);
