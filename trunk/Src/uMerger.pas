@@ -10,6 +10,9 @@
  *  使用FFVCL进行视频音频合成的类实现。
  *  2011-04-08 Created 实现基本功能，但是输出格式SetOutputOption没有完成，
  *             暂用UseDefaultOO代替。
+ *  使用方法：1、创建TMerger对象。2、调用成员函数AddVideo和AddAudio。
+ *            3、调用成员函数SetOutputOption或使用UseDefaultOO设置输出格式。
+ *            4、start操作。
  *)
 unit uMerger;
 
