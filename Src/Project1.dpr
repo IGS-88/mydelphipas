@@ -9,7 +9,8 @@ uses
   WaveMaker in 'WaveMaker.pas',
   AudioCapture in 'AudioCapture.pas',
   AudioTask in 'AudioTask.pas',
-  uMerger in 'uMerger.pas';
+  uMerger in 'uMerger.pas',
+  ScreenCapture in '..\Pas¿â\ScreenCapture.pas';
 
 {$R *.res}
 

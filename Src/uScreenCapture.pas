@@ -4,6 +4,19 @@ interface
 uses
   Windows, SysUtils, Classes, MyUtils, ScreenCapture, FFEncode, uGUID, uLogger;
 type
+  TGrabMode = ScreenCapture.TGrabMode;
+  PVideoInputOption = ^TVideoInputOption;
+  TVideoInputOption = record
+    Handle: HWND;
+    x_off, y_off: Integer;
+    Width, Height: Integer;
+    Client: Integer;     // client=1: capture client dc instead of window dc
+    Cursor: Integer;     // cursor=1: grab cursor
+    ShowFrame: Integer;  // showframe=1: show flash frame
+    GrabMode: TGrabMode;
+    FrameRate: string;   // framerate=int/int: Numerator/Denominator, e.g. 30000/1001 (-> 29.97)
+  end;
+
   {PProgressInfo = ^TProgressInfo;
   TProgressInfo = record
     TaskIndex: Integer;     // index of converting tasks
@@ -57,7 +70,10 @@ type
 
     FID: String;  //唯一的身份识别码  { GUID }
     FLastError: String;
-//    FThreadID:
+    FGrabMode: TGrabMode; //GrabMode
+    FMutex: THandle;   //线程锁访问
+    FSCaptureForm: TCaptureForm; //虚拟的截屏窗口，表示所截窗口。Shared with threads;
+    FCaptureForm: TCaptureForm;  //Used in current thread only;
 
     FOnAudioHook: TAudioHookEvent;
     FOnPreviewBitmap: TPreviewBitmapEvent;
@@ -65,7 +81,6 @@ type
     FOnTerminate: TTerminateEvent;
     FOnInputVideoHook:  TVideoHookEvent;
     FOnOutputVideoHook: TVideoHookEvent;
-//    FOnError: TErrorEvent;
 
     procedure DoProgress(Sender: TObject; AProgressInfo: PProgressInfo);
     procedure DoTerminate(Sender: TObject; const ATerminateInfo: TTerminateInfo);
@@ -80,6 +95,10 @@ type
     function  ReadPreviewBitmap: Boolean;
     procedure SetProgressIntegerval(Value: Integer);
     function  ReadProgressIntegerval: Integer;
+
+    procedure InitCpForm; //初始化FCaptureForm
+    procedure SetCpForm(Hwnd: HWND;Left, Top, Width, Height: Integer; GrabMode: TGrabMode; ShowFrame: Integer);  //设置FCaptureForm
+    procedure SynCpForm();
   protected
     //
   public
@@ -98,7 +117,6 @@ type
     property  PreviewBitmap: Boolean read ReadPreviewBitmap write SetPreviewBitmap;
     property  ProgressInterval: Integer read ReadProgressIntegerval write SetProgressIntegerval;
 
-//    property  OnError: TErrorEvent read FOnError write FOnError;  //error 触发事件
     property  Encoder: TFFEncoder read FEncode;
     property  ID: string read FID;
     property  Status: TCaptureStatus read FStatus;
@@ -109,24 +127,36 @@ type
     procedure Resume;
     procedure Stop;
 
-    //  screen capture parameters
-    //  filename format: <option1>=<param1>;<option2>=<param2>;...
-    //  hwnd=int: window handle
-    //  offset=int,int: offset on x and y against the final source window
-    //  framesize=int,int: width and height
-    //  framerate=int/int: Numerator/Denominator, e.g. 30000/1001 (-> 29.97)
-    //  showframe=1: show frame
-    //  client=1: capture client dc instead of window dc
-    //  cursor=1: grab cursor
-    //  usedc=true: capture window use bitblt DC
-    //  title=str: window caption, must be last option
-    procedure  SetCaptureOptions(OptionCaption: String);
+    // screen capture parameters
+    // filename format: <option1>=<param1>;<option2>=<param2>;...
+    //not_user  point_captureform=int: Point of TCaptureForm
+    //
+
+    //not_user  parentguid=string of guid, unique Object
+    //not_user  mutex=int: the mutex for synchronize
+    procedure  SetCaptureOptions(VIO: TVideoInputOption);
 
     function   SetOutputOptins({参数待定}): Boolean;  { TODO : 初始化并设置 TOutputOption  FOO }
     procedure  UseDefaultOO;
   end;
 
+  procedure InitVideoInputOption(VIO: PVideoInputOption);
+
 implementation
+
+procedure InitVideoInputOption(VIO: PVideoInputOption);
+begin
+  VIO.Handle := 0;
+  VIO.x_off := 0;
+  VIO.y_off := 0;
+  VIO.Width := 0;
+  VIO.Height := 0;
+  VIO.Client := 0;
+  VIO.Cursor := 0;
+  VIO.ShowFrame := 0;
+  VIO.GrabMode := gmDC;
+  VIO.FrameRate := '15/1';
+end;
 
 { TScreenCapture }
 
@@ -135,6 +165,9 @@ begin
   FLibAVPath := ExePath + 'LibAV';
   FID := GetGUID;
   FOO.FileName := 'UnInit';
+  FMutex := CreateMutex(nil, False, 'Mutex');  //创建Mutex锁
+  FGrabMode := gmDC;
+  InitCpForm;
 
   FOnAudioHook := nil;
   FOnPreviewBitmap := nil;
@@ -174,6 +207,7 @@ begin
   begin
     Stop;
   end;
+  CloseHandle(FMutex); //释放Mutex句柄
   FEncode.Destroy;
   inherited;
 end;
@@ -243,6 +277,21 @@ begin
   end;
 end;
 
+procedure TScreenCapture.InitCpForm;
+begin
+  with FCaptureForm do
+  begin
+    Handle := 0;
+    Left := 0;
+    Top := 0;
+    Width := 0;
+    Height := 0;
+    GrabMode := gmDC;
+    ShowFrame := 1;
+  end;
+  FSCaptureForm := FCaptureForm;
+end;
+
 procedure TScreenCapture.Pause;
 begin
   FEncode.Pause;
@@ -267,9 +316,31 @@ begin
   WriteLog(GetCurrentThreadId, ID, llDebug, 'Capture Resume!'#10);
 end;
 
-procedure TScreenCapture.SetCaptureOptions(OptionCaption: String);
+procedure TScreenCapture.SetCaptureOptions(VIO: TVideoInputOption);
+var
+  st: string;
 begin
-  FOptionCaptions := OptionCaption;
+  FOptionCaptions := '';
+  SetCpForm(VIO.Handle,VIO.x_off,VIO.y_off,VIO.Width,VIO.Height,VIO.GrabMode,VIO.ShowFrame);
+  SynCpForm;
+  st := 'framerate=' + VIO.FrameRate + ';';
+  st := st + 'client=' + IntToStr(VIO.Client) + ';';
+  st := st + 'cursor=' + IntToStr(VIO.Cursor) + ';';
+  st := st + 'parentguid=' + FID + ';';
+  st := st + 'mutex=' + IntToStr(FMutex) + ';';
+  st := st + 'point_captureform=' + IntToStr(dword(@FSCaptureForm)) + ';';
+  FOptionCaptions := st;
+end;
+
+procedure TScreenCapture.SetCpForm(Hwnd: HWND;Left, Top, Width, Height: Integer; GrabMode: TGrabMode; ShowFrame: Integer);
+begin
+  FCaptureForm.Handle := Hwnd;
+  FCaptureForm.Left := Left;
+  FCaptureForm.Top := Top;
+  FCaptureForm.Width := Width;
+  FCaptureForm.Height := Height;
+  FCaptureForm.GrabMode := GrabMode;
+  FCaptureForm.ShowFrame := ShowFrame;
 end;
 
 function TScreenCapture.SetOutputOptins: Boolean;
@@ -330,7 +401,6 @@ begin
   InitInputOptions(@FIO);
   FIO.ForceFormat := 'screencapture';
 
-  FOptionCaptions := 'ParentGUID='+ FID + ';' + FOptionCaptions;
   LIndex := FEncode.AddTask(FOptionCaptions, @FIO);
   if LIndex < 0 then
   begin
@@ -356,6 +426,15 @@ begin
   FEncode.Stop;
   FStatus := csStopped;
   WriteLog(GetCurrentThreadId, ID, llDebug, 'Capture Stopped!'#10);
+end;
+
+procedure TScreenCapture.SynCpForm;
+begin
+  if WaitForSingleObject(FMutex, INFINITE) = WAIT_OBJECT_0 then
+  begin
+    FSCaptureForm := FCaptureForm;
+  end;
+  ReleaseMutex(FMutex);
 end;
 
 procedure TScreenCapture.UseDefaultOO;
