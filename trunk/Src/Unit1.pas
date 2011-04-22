@@ -56,6 +56,7 @@ var
   ScreenCapture2: TScreenCapture;
   TargetPID: Cardinal= 0;
 
+  VIO: TVideoInputOption;
   Merger: TMerger;
 
 implementation
@@ -70,18 +71,25 @@ begin
   ScreenCapture1.OnPreviewBitmap := OnPreviewBitmap;
   mmo1.Lines.Add('Create ScreenCapture');
   SetOnLogEvent(OnLog);
-  Edit1.Text := 'offset=0,0;framesize=500,500;framerate=15/1;showframe=1;cursor=1;usedc=true;';
+//  Edit1.Text := 'offset=0,0;framesize=500,500;framerate=15/1;showframe=1;cursor=1;grabmode=1;';
+  Edit1.Text := '1443066';
   edt2.Text := '百度与作家团体关键问题仍对峙 110328 北京您早 - 视频 - 优酷视频 - 在线观看 - Windows Internet Explorer';
 
   CreateAudioTasks();
-
 end;
 
 procedure TForm1.btn1Click(Sender: TObject);
 begin
   ScreenCapture1.PreviewBitmap := True;
   ScreenCapture1.ProgressInterval := 100;
-  ScreenCapture1.SetCaptureOptions(Edit1.Text);
+//  ScreenCapture1.SetCaptureOptions(Edit1.Text);
+  InitVideoInputOption(@VIO);
+  VIO.Handle := StrToInt(Edit1.Text);
+  VIO.Height := 500;
+  VIO.Width := 500;
+  VIO.ShowFrame := 1;
+  VIO.Cursor := 1;
+  ScreenCapture1.SetCaptureOptions(VIO);
   ScreenCapture1.UseDefaultOO;
   if not ScreenCapture1.Start('ScreenCapture1.mp4') then
   ShowMessage('Error');
@@ -168,7 +176,15 @@ end;
 procedure TForm1.btn7Click(Sender: TObject);
 begin
   ScreenCapture2 := TScreenCapture.Create(Self);
-  ScreenCapture2.SetCaptureOptions(Edit1.Text);
+//  ScreenCapture2.SetCaptureOptions(Edit1.Text);
+  InitVideoInputOption(@VIO);
+  VIO.Handle := StrToInt(Edit1.Text);
+  VIO.Height := 500;
+  VIO.Width := 500;
+  VIO.ShowFrame := 1;
+  VIO.Cursor := 1;
+  VIO.GrabMode := TGrabMode(1);
+  ScreenCapture2.SetCaptureOptions(VIO);
   ScreenCapture2.UseDefaultOO;
   if not ScreenCapture2.Start('ScreenCapture2.mp4') then
   begin
@@ -203,5 +219,6 @@ begin
   Merger.VideoStreamID := Merger.GetFirstVideoStream(edt3.Text);
   Merger.AudioStreamID := Merger.GetFirstAudioStream(edt4.Text);
 end;
+
 
 end.

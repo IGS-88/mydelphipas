@@ -1,56 +1,3 @@
-(*
- * Win32 video grab interface
- *
- * This file is part of FFmpeg.
- *
- * Copyright (C) 2007 Christophe Gisquet <christophe.gisquet <at> free.fr>
- *
- * FFmpeg is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * FFmpeg is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with FFmpeg; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
- *)
-
-(**
- * @file win32grab.c
- * Win32 frame device demuxer by Christophe Gisquet
- * <christophe.gisquet <at> free.fr>
- *)
-
-(*
- * CCAVC - CodeCoolie Audio Video Components
- * http://www.CCAVC.com
- * FFVCL - Delphi FFmpeg VCL Components
- * http://www.DelphiFFmpeg.com
- *
- * Original file: win32grab.c
- * Ported by CodeCoolie@CNSW 2009/08/31 -> $Date:: 2010-09-09 #$
- *)
-
- (*
-  * Add things between '//============'
-  * ####Changed By Codeup@ 2011/3/17 -> *****
-  * Use PrintWindow API to capture the Windows behind foreground Windows.
-  * But PrintWindow API has some thread problems, uses this file carefully in thread.
-  * redirect logs to my logger which define in uLogger.pas.
-  *
-  * ####Changed By Codeup@ 2011-04-05
-  * change isDesktop variable to UseDC, fix notes about options input.
-  *
-  * ####Changed By Codeup@ 2011-04-16
-  * Add type TGrabMode and TCheckGrabModeEvent to change GrabMode dynamically.
-  * Chage parameter UseDC to GrabMode in win32grab_read_header().
-  *)
-
 unit ScreenCapture;
 
 interface
@@ -65,7 +12,14 @@ uses
 type
 //======================================
   TGrabMode = (gmDC, gmPW); (* The grab mode, gmDC use GetDC and gmPW use printwindow function*)
-  TCheckGrabModeEvent = procedure(var GrabMode: TGrabMode) of object;
+  PCaptureForm = ^TCaptureForm;
+  TCaptureForm = record
+    Handle: HWND;
+    Left, Top: Integer;
+    Width, Height: Integer;
+    GrabMode: TGrabMode;
+    ShowFrame: Integer;
+  end;
 //======================================
 procedure register_screencapture;
 implementation
@@ -95,7 +49,7 @@ type
   TFrameForm = class;
   Pwin32_grab = ^Twin32_grab;
   Twin32_grab = record
-    window_handle: HWND;    (* handle of the window for the grab *)
+//    window_handle: HWND;    (* handle of the window for the grab *)
     source_hdc: HDC;        (* Source device context *)
     window_hdc: HDC;        (* Destination, source-compatible device context *)
     hbmp: HBITMAP;          (* Information on the bitmap captured *)
@@ -103,26 +57,26 @@ type
     Mem_hdc: HDC;           (* HDC in Memory, the same as window_hdc. PrintWindow to Mem_hdc *)//Add at 2011/3/17 by Codeup
     Hbmp_Mem: HBITMAP;      (* HBITMAP for Mem_hdc, PrintWindow WindowScreen to Mem_hdc, which selected with HBmp_Mem *)
     ParentGUID: string;     (* GUID of Parent TScreenCapture. Send this param to Log *)
-    GrabMode: TGrabMode;    (* The grab mode for screen capture, Default Value = gmDC *)
-    OnCheckGrabMode: TCheckGrabModeEvent; (* Check GrabMode this is an callback, you can change GrabMode here, need synchronization processing *)
+    CaptureForm: PCaptureForm;
+    Mutex: THandle;         (* *)
     //=======================================================
     time_base: TAVRational; (* Time base *)
     time_frame: Int64;      (* Current time *)
     time_start: Int64;
     Started: Integer;
 
-    x_off: Integer;         (* Horizontal top-left corner coordinate *)
-    y_off: Integer;         (* Vertical top-left corner coordinate *)
+//    x_off: Integer;         (* Horizontal top-left corner coordinate *)
+//    y_off: Integer;         (* Vertical top-left corner coordinate *)
     cursor: Integer;        (* Also capture cursor *)
 
     size: Integer;          (* Size in bytes of the grab frame *)
-    width: Integer;         (* Width of the grab frame *)
-    height: Integer;        (* Height of the grab frame *)
+//    width: Integer;         (* Width of the grab frame *)
+//    height: Integer;        (* Height of the grab frame *)
     bpp: Integer;           (* Bits per pixel of the grab frame *)
 
     client: Integer;        // only capture client of window
 
-    show_frame: Integer;    // show flashing frame
+//    show_frame: PInteger;    // show flashing frame
     frame: TFrameForm;      // frame form
   end;
 
@@ -152,27 +106,182 @@ type
 
 function PrintWindow(SourceWindow: hwnd; Destination: hdc; nFlags: cardinal): bool; stdcall; external 'user32.dll' name 'PrintWindow';
 
-function GetTopLeft(const Awin32_grab: Pwin32_grab; const ABorder: Integer): TPoint;
+function GetCFRect(const Awin32_grab: Pwin32_grab; const ABorder: Integer; var ShowFrame: Integer): TRect;
 var
   R: TRect;
+  window_handle: HWND;
+  x_off, y_off: Integer;
+  width, height: Integer;
 begin
-  if Awin32_grab.window_handle <> 0 then
+  if WaitForSingleObject(Awin32_grab.Mutex, INFINITE) = WAIT_OBJECT_0 then
+  begin
+    window_handle := Awin32_grab.CaptureForm.Handle;
+    x_off := Awin32_grab.CaptureForm.Left;
+    y_off := Awin32_grab.CaptureForm.Top;
+    width := Awin32_grab.CaptureForm.Width;
+    height := Awin32_grab.CaptureForm.Height;
+    ShowFrame := Awin32_grab.CaptureForm.ShowFrame;
+  end;
+  ReleaseMutex(Awin32_grab.Mutex);
+
+  if window_handle <> 0 then
   begin
     if Awin32_grab.client <> 0 then
     begin
-      Windows.GetClientRect(Awin32_grab.window_handle, R);
-      Windows.ClientToScreen(Awin32_grab.window_handle, R.TopLeft);
+      Windows.GetClientRect(window_handle, R);
+      Windows.ClientToScreen(window_handle, R.TopLeft);
     end
     else
-      GetWindowRect(Awin32_grab.window_handle, R);
-    Result.X := R.Left + Awin32_grab.x_off - ABorder;
-    Result.Y := R.Top + Awin32_grab.y_off - ABorder;
+      GetWindowRect(window_handle, R);
+    Result.Left := R.Left + x_off - ABorder;
+    Result.Top := R.Top + y_off - ABorder;
   end
   else
   begin
-    Result.X := Awin32_grab.x_off - ABorder;
-    Result.Y := Awin32_grab.y_off - ABorder;
+    Result.Left := x_off - ABorder;
+    Result.Top := y_off - ABorder;
   end;
+  Result.Right := Result.Left + width + ABorder * 2;
+  Result.Bottom := Result.Top + height + ABorder * 2;
+end;
+
+function GetTopLeft(const Awin32_grab: Pwin32_grab; const ABorder: Integer): TPoint;
+var
+  R: TRect;
+  window_handle: HWND;
+  x_off, y_off: Integer;
+begin
+  if WaitForSingleObject(Awin32_grab.Mutex, INFINITE) = WAIT_OBJECT_0 then
+  begin
+    window_handle := Awin32_grab.CaptureForm.Handle;
+    x_off := Awin32_grab.CaptureForm.Left;
+    y_off := Awin32_grab.CaptureForm.Top;
+  end;
+  ReleaseMutex(Awin32_grab.Mutex);
+
+  if window_handle <> 0 then
+  begin
+    if Awin32_grab.client <> 0 then
+    begin
+      Windows.GetClientRect(window_handle, R);
+      Windows.ClientToScreen(window_handle, R.TopLeft);
+    end
+    else
+      GetWindowRect(window_handle, R);
+    Result.X := R.Left + x_off - ABorder;
+    Result.Y := R.Top + y_off - ABorder;
+  end
+  else
+  begin
+    Result.X := x_off - ABorder;
+    Result.Y := y_off - ABorder;
+  end;
+end;
+
+function GrabBmp(s: Pwin32_grab): Boolean;
+var
+  width, height: Integer;
+  x_off, y_off: Integer;
+  bmp: BITMAP;
+  errcode: Integer;
+  errmsg: string;
+  GrabMode: TGrabMode;
+  window_handle: HWND;
+begin
+  if WaitForSingleObject(s.Mutex, INFINITE) = WAIT_OBJECT_0 then
+  begin
+    width := s.CaptureForm.Width;
+    height := s.CaptureForm.Height;
+    x_off := s.CaptureForm.Left;
+    y_off := s.CaptureForm.Top;
+    GrabMode := s.CaptureForm.GrabMode;
+    window_handle := s.CaptureForm.Handle;
+  end;
+  ReleaseMutex(s.Mutex);
+
+  if s.hbmp <> 0 then
+  begin
+    DeleteObject(s.hbmp);
+  end;
+
+  s.hbmp := CreateCompatibleBitmap(s.source_hdc, width, height);
+  if s.hbmp = 0 then
+  begin
+    WriteLog(GetCurrentThreadId, s.ParentGUID, llerror, Format('Screen DC CreateCompatibleBitmap (error %d)'#10, [GetLastError]));
+    Result := False;
+    Exit;
+  end;
+
+  (* Get info from the bitmap *)
+  FillChar(bmp, sizeof(BITMAP), 0);
+  if GetObject(s.hbmp, sizeof(BITMAP), @bmp) = 0 then
+  begin
+    errcode := GetLastError;
+    if errcode <> 0 then
+    begin
+      errmsg := SysErrorMessage(errcode);
+      WriteLog(GetCurrentThreadId, s.ParentGUID, llerror, Format('GetObject (error %d: %s)'#10, [errcode, errmsg]));
+      Result := False;
+      Exit;
+    end
+    else
+    begin
+      bmp.bmType := 0;
+      bmp.bmWidth := width;
+      bmp.bmHeight := height;
+      bmp.bmWidthBytes := width * s.bpp div 8;
+      bmp.bmPlanes := 1;
+      bmp.bmBitsPixel := s.bpp;
+      bmp.bmBits := nil;
+      {WriteLog(GetCurrentThreadId, s.ParentGUID, llWarning,
+               Format('GetObject failed. Force Bitmap type %d, size %dx%dx%u, ' +
+               '%u planes of width %d bytes'#10,
+               [bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
+               bmp.bmPlanes, bmp.bmWidthBytes]));}
+    end;
+  end;
+      {WriteLog(GetCurrentThreadId, s.ParentGUID, llDebug,
+               Format('Using Bitmap type %d, size %dx%dx%u, ' +
+               '%u planes of width %d bytes'#10,
+               [bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
+               bmp.bmPlanes, bmp.bmWidthBytes]));}
+
+  if SelectObject(s.window_hdc, s.hbmp) = 0 then
+  begin
+    WriteLog(GetCurrentThreadId, s.ParentGUID, llerror, Format('SelectObject (error %d)'#10, [GetLastError]));
+    Result := False;
+    Exit;
+  end;
+  s.size := bmp.bmWidthBytes * bmp.bmHeight * bmp.bmPlanes;
+
+  if GrabMode = gmDC then
+  begin
+    if not BitBlt(s.window_hdc, 0, 0, width, height,
+                  s.source_hdc, x_off, y_off, SRCCOPY) then
+    begin
+      WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('Failed to BitBlt image (error %d)'#10, [GetLastError]));
+      Result := False;
+      Exit;
+    end;
+  end
+  else
+  begin
+    if not PrintWindow(window_handle, s.Mem_hdc, 0) then
+    begin
+      WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('PrintWindow to Mem_hdc failed (error %d)'#10, [GetLastError]));
+      Result := False;
+      Exit;
+    end;
+    if not BitBlt(s.window_hdc, 0, 0, width, height,
+                  s.Mem_hdc, x_off, y_off, SRCCOPY) then
+    begin
+      WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('Failed to BitBlt image (error %d)'#10, [GetLastError]));
+      Result := False;
+      Exit;
+    end;
+  end;
+
+  Result := True;
 end;
 
 { TFlashThread }
@@ -208,6 +317,7 @@ constructor TFrameForm.Create(Awin32_grab: Pwin32_grab);
   var
     P: TPoint;
     rgn, rgn1, rgn2: HRGN;
+    fwidth, fheight: Integer;
   begin
     // frame outlook
     BorderStyle := bsNone;
@@ -216,14 +326,22 @@ constructor TFrameForm.Create(Awin32_grab: Pwin32_grab);
     Position := poDesigned;
     Color := CFrameColors[0];
 
+
     // frame bounds
     P := GetTopLeft(Awin32_grab, FBorder);
-    SetBounds(P.X, P.Y, Fwin32_grab.width + 2 * FBorder, Fwin32_grab.height + 2 * FBorder);
+    if WaitForSingleObject(Fwin32_grab.Mutex, INFINITE) = WAIT_OBJECT_0 then
+    begin
+      fwidth := Fwin32_grab.CaptureForm.Width;
+      fheight := Fwin32_grab.CaptureForm.Height;
+    end;
+    ReleaseMutex(Fwin32_grab.Mutex);
+    
+    SetBounds(P.X, P.Y, fwidth + 2 * FBorder, fheight + 2 * FBorder);
 
     // frame region
-    rgn :=  CreateRectRgn(0, 0, Fwin32_grab.width + 2 * FBorder, Fwin32_grab.height + 2 * FBorder);
-    rgn1 := CreateRectRgn(0, 0, Fwin32_grab.width + 2 * FBorder, Fwin32_grab.height + 2 * FBorder);
-    rgn2 := CreateRectRgn(FBorder, FBorder, Fwin32_grab.width + FBorder, Fwin32_grab.height + FBorder);
+    rgn :=  CreateRectRgn(0, 0, fwidth + 2 * FBorder, fheight + 2 * FBorder);
+    rgn1 := CreateRectRgn(0, 0, fwidth + 2 * FBorder, fheight + 2 * FBorder);
+    rgn2 := CreateRectRgn(FBorder, FBorder, fwidth + FBorder, fheight + FBorder);
     CombineRgn(rgn, rgn1, rgn2, RGN_DIFF);
     SetWindowRgn(Handle, rgn, True);
     DeleteObject(rgn);
@@ -261,15 +379,23 @@ end;
 
 procedure TFrameForm.AdjustPosition;
 var
-  P: TPoint;
+  R: TRect;
+  fwidth, fheight: Integer;
+  showframe: Integer;
 begin
   if FLock <> 0 then
     Exit;
   FLock := 1;
   try
-    P := GetTopLeft(Fwin32_grab, FBorder);
-    if (Left <> P.X) or (Top <> P.Y) then
-      SetWindowPos(Handle, HWND_TOPMOST, P.X, P.Y, Width, Height,
+    R := GetCFRect(Fwin32_grab, FBorder, showframe);
+    fwidth := R.Right - r.Left;
+    fheight := r.Bottom - r.Top;
+    if showframe <> 0 then
+      Show
+    else
+      Hide;
+    if (Left <> R.Left) or (Top <> R.Top) then
+      SetWindowPos(Handle, HWND_TOPMOST, R.Left, R.Top, fwidth, fheight,
         SWP_NOSIZE or SWP_NOACTIVATE)
     else
       SetWindowPos(Handle, HWND_TOPMOST, 0, 0, 0, 0,
@@ -312,6 +438,9 @@ var
   show_title: Boolean;
   dim: TRect;
 
+  window_handle: HWND;
+  fwidth, fheight, ftop, fleft: Integer;
+  show_frame: Integer;
   Mem_bmp: BITMAP;
 begin
   ctx := s.priv_data;
@@ -321,134 +450,100 @@ begin
 
   title := 'N/A';
   show_title := False;
-
+  show_frame := 1;
   // screen capture parameters
   // filename format: <option1>=<param1>;<option2>=<param2>;...
-  //  hwnd=int: window handle
-  //  offset=int,int: offset on x and y against the final source window
-  //  framesize=int,int: width and height
+  //  point_captureform=int: Point of TCaptureForm
   //  framerate=int/int: Numerator/Denominator, e.g. 30000/1001 (-> 29.97)
-  //  showframe=1: show frame
   //  client=1: capture client dc instead of window dc
   //  cursor=1: grab cursor
-  //  grabmode=int: the grabmode for screencapture. 0 is use GetDC and 1 use printwindow function. default value = 0;
   //  parentguid=string of guid, unique Object
-  //  title=str: window caption, must be last option
-//===========================
-  ctx.OnCheckGrabMode := nil;
-//===========================
+  //  mutex=int: the mutex for synchronize
   param := string(s.filename);
   while param <> '' do
   begin
-    V := Fetch(param, ';', False);
+    V := Fetch(param, ';');
     N := Fetch(V, '=');
-    if SameText(N, 'title') then
+    if SameText(N, 'point_captureform') then
+      // the virtual Form for capture
+      ctx.CaptureForm := Pointer(StrToIntDef(V, 0))
+    else if SameText(N, 'framerate') then
     begin
-      Fetch(param, '=');
-      V := param;
-      // find window hanble by title
-      title := PAnsiChar(AnsiString(V));
-      ctx.window_handle := FindWindowA(nil, title);
-      //show_title := True;
-      Break;
+      // framerate=Numerator/Denominator
+      N := Fetch(V, '/');
+      ap.time_base.den := StrToInt(N);
+      ap.time_base.num := StrToInt(V);
     end
-    else
-    begin
-      Fetch(param, ';');
-      if SameText(N, 'hwnd') then
-        // special window hanble
-        ctx.window_handle := StrToIntDef(V, 0)
-      else if SameText(N, 'offset') then
-      begin
-        // offset=x,y
-        N := Fetch(V, ',');
-        ctx.x_off := StrToInt(N);
-        ctx.y_off := StrToInt(V);
-      end
-      else if SameText(N, 'framesize') then
-      begin
-        // framesize=w,h
-        N := Fetch(V, ',');
-        width := StrToInt(N);
-        height := StrToInt(V);
-      end
-      else if SameText(N, 'framerate') then
-      begin
-        // framerate=Numerator/Denominator
-        N := Fetch(V, '/');
-        ap.time_base.den := StrToInt(N);
-        ap.time_base.num := StrToInt(V);
-      end
-      else if SameText(N, 'showframe') then
-        // show frame
-        ctx.show_frame := StrToIntDef(V, 1)
-      else if SameText(N, 'client') then
-        // capture client dc instead of window dc
-        ctx.client := StrToIntDef(V, 1)
-      else if SameText(N, 'cursor') then
-        // capture cursor
-        ctx.cursor := StrToIntDef(V, 1)
-//=========================================
-      else if SameText(N, 'parentguid') then
-        // Parent GUID for log              //Add for record the parent GUID
-        ctx.ParentGUID := V
-      else if SameText(N, 'grabmode') then
-        ctx.GrabMode := TGrabMode(StrTointDef(v,0))
-      else if SameText(N, 'ongrabmode') then
-      begin
-        @ctx.OnCheckGrabMode := Ptr(StrToIntDef(v, 0));
-      end;
-//=========================================
-    end;
+    else if SameText(N, 'client') then
+      // capture client dc instead of window dc
+      ctx.client := StrToIntDef(V, 1)
+    else if SameText(N, 'cursor') then
+      // capture cursor
+      ctx.cursor := StrToIntDef(V, 1)
+    else if SameText(N, 'parentguid') then
+      // Parent GUID for log              //Add for record the parent GUID
+      ctx.ParentGUID := V
+    else if SameText(N, 'mutex') then
+      ctx.Mutex := StrToIntDef(v, 0);
   end;
-//=========================================
-  if (ctx.window_handle = 0) and (ctx.GrabMode = gmPW) then
-    ctx.GrabMode := gmDC;
-//=========================================
+
+  if WaitForSingleObject(ctx.Mutex, INFINITE) = WAIT_OBJECT_0 then
+  begin
+    window_handle := ctx.CaptureForm.Handle;
+    width := ctx.CaptureForm.Width;
+    height := ctx.CaptureForm.Height;
+    show_frame := ctx.CaptureForm.ShowFrame;
+  end;
+  ReleaseMutex(ctx.Mutex);
 
   if ctx.client <> 0 then
-    ctx.source_hdc := GetDC(ctx.window_handle)
+    ctx.source_hdc := GetDC(window_handle)
   else
-    ctx.source_hdc := GetWindowDC(ctx.window_handle);
+    ctx.source_hdc := GetWindowDC(window_handle);
   if ctx.source_hdc = 0 then
   begin
-//    av_log(s, AV_LOG_ERROR, 'Couldn''t get window DC (error %d)'#10, GetLastError);
     WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Couldn''t get window DC (error %d)'#10, [GetLastError]));
     Result := AVERROR_IO;
     Exit;
   end;
 
-  screenwidth := GetDeviceCaps(ctx.source_hdc, HORZRES);
-  screenheight := GetDeviceCaps(ctx.source_hdc, VERTRES);
-  if ctx.window_handle <> 0 then
+  screenwidth := GetDeviceCaps(GetDC(0), HORZRES);
+  screenheight := GetDeviceCaps(GetDC(0), VERTRES);
+  if window_handle <> 0 then
   begin
     if ctx.client <> 0 then
-      GetClientRect(ctx.window_handle, dim)
+      GetClientRect(window_handle, dim)
     else
-      GetWindowRect(ctx.window_handle, dim);
-    ctx.width := dim.right - dim.left;
-    ctx.height := dim.bottom - dim.top;
+      GetWindowRect(window_handle, dim);
+    fwidth := dim.right - dim.left;
+    fheight := dim.bottom - dim.top;
   end
   else
   begin
-    ctx.width := screenwidth;
-    ctx.height := screenheight;
+    fwidth := screenwidth;
+    fheight := screenheight;
   end;
-  if (width > 0) and (width <> ctx.width) then
-    ctx.width := width;
-  if (height > 0) and (height <> ctx.height) then
-    ctx.height := height;
+  if (width > 0) and (width <> fwidth) then
+    fwidth := width;
+  if (height > 0) and (height <> fheight) then
+    fheight := height;
 
-  if ctx.x_off + ctx.width > screenwidth then
-    ctx.width := screenwidth - ctx.x_off;
-  if ctx.y_off + ctx.height > screenheight then
-    ctx.height := screenheight - ctx.y_off;
+  if fleft + fwidth > screenwidth then
+    fwidth := screenwidth - fleft;
+  if ftop + fheight > screenheight then
+    fheight := screenheight - ftop;
+
+  if WaitForSingleObject(ctx.Mutex, INFINITE) = WAIT_OBJECT_0 then
+  begin
+    ctx.CaptureForm.Width := fwidth;
+    ctx.CaptureForm.Height := fheight;
+  end;
+  ReleaseMutex(ctx.Mutex);
 
   ctx.bpp := GetDeviceCaps(ctx.source_hdc, BITSPIXEL);
 
-  if (ctx.width < 0) or (ctx.height < 0) or (ctx.bpp mod 8 <> 0) then
+  if (fwidth < 0) or (fheight < 0) or (ctx.bpp mod 8 <> 0) then
   begin
-//    av_log(s, AV_LOG_ERROR, 'Invalid properties, aborting'#10);
     WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, 'Invalid properties, aborting'#10);
     Result := AVERROR_IO;
     Exit;
@@ -457,17 +552,14 @@ begin
   ctx.window_hdc := CreateCompatibleDC(ctx.source_hdc);
   if ctx.window_hdc = 0 then
   begin
-//    av_log(s, AV_LOG_ERROR, 'Screen DC CreateCompatibleDC (error %d)'#10, GetLastError);
     WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Screen DC CreateCompatibleDC (error %d)'#10, [GetLastError]));
     Result := AVERROR_IO;
     Exit;
   end;
 
-//  ====================================================
   ctx.Mem_hdc := CreateCompatibleDC(ctx.source_hdc);
   if ctx.Mem_hdc = 0 then
   begin
-//    av_log(s, AV_LOG_ERROR, 'Mem DC CreateCompatibleDC (error %d)'#10, GetLastError);
     WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Mem DC CreateCompatibleDC (error %d)'#10, [GetLastError]));
     Result := AVERROR_IO;
     Exit;
@@ -476,82 +568,63 @@ begin
   ctx.Hbmp_Mem := CreateCompatibleBitmap(ctx.source_hdc, screenwidth, screenheight);
   if ctx.Hbmp_Mem = 0 then
   begin
-//    av_log(s, AV_LOG_ERROR, 'Mem DC CreateCompatibleBitmap (error %d)'#10, GetLastError);
     WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Mem DC CreateCompatibleBitmap (error %d)'#10, [GetLastError]));
     Result := AVERROR_IO;
     Exit;
   end;
-//  ===================================================
 
-  ctx.hbmp := CreateCompatibleBitmap(ctx.source_hdc, ctx.width, ctx.height);
-  if ctx.hbmp = 0 then
-  begin
-//    av_log(s, AV_LOG_ERROR, 'Screen DC CreateCompatibleBitmap (error %d)'#10, GetLastError);
-    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Screen DC CreateCompatibleBitmap (error %d)'#10, [GetLastError]));
-    Result := AVERROR_IO;
-    Exit;
-  end;
+//  ctx.hbmp := CreateCompatibleBitmap(ctx.source_hdc, ctx.width, ctx.height);
+//  if ctx.hbmp = 0 then
+//  begin
+//    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Screen DC CreateCompatibleBitmap (error %d)'#10, [GetLastError]));
+//    Result := AVERROR_IO;
+//    Exit;
+//  end;
 
   (* Get info from the bitmap *)
-  FillChar(bmp, sizeof(BITMAP), 0);
-  if GetObject(ctx.hbmp, sizeof(BITMAP), @bmp) = 0 then
-  begin
-    errcode := GetLastError;
-    if errcode <> 0 then
-    begin
-      errmsg := SysErrorMessage(errcode);
-//      av_log(s, AV_LOG_ERROR, 'GetObject (error %d: %s)'#10, errcode, PAnsiChar(AnsiString(errmsg)));
-      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('GetObject (error %d: %s)'#10, [errcode, errmsg]));
-      Result := AVERROR_IO;
-      Exit;
-    end
-    else
-    begin
-      bmp.bmType := 0;
-      bmp.bmWidth := ctx.width;
-      bmp.bmHeight := ctx.height;
-      bmp.bmWidthBytes := ctx.width * ctx.bpp div 8;
-      bmp.bmPlanes := 1;
-      bmp.bmBitsPixel := ctx.bpp;
-      bmp.bmBits := nil;
-//      av_log(s, AV_LOG_WARNING,
-//             'GetObject failed. Force Bitmap type %d, size %dx%dx%u, ' +
-//             '%u planes of width %d bytes'#10,
-//             bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
-//             bmp.bmPlanes, bmp.bmWidthBytes);
-      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llWarning,
-               Format('GetObject failed. Force Bitmap type %d, size %dx%dx%u, ' +
-               '%u planes of width %d bytes'#10,
-               [bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
-               bmp.bmPlanes, bmp.bmWidthBytes]));
-    end;
-  end
-  else
-//    av_log(s, AV_LOG_DEBUG,
-//           'Using Bitmap type %d, size %dx%dx%u, ' +
-//           '%u planes of width %d bytes'#10,
-//           bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
-//           bmp.bmPlanes, bmp.bmWidthBytes);
-      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llDebug,
-               Format('Using Bitmap type %d, size %dx%dx%u, ' +
-               '%u planes of width %d bytes'#10,
-               [bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
-               bmp.bmPlanes, bmp.bmWidthBytes]));
-  if SelectObject(ctx.window_hdc, ctx.hbmp) = 0 then
-  begin
-//    av_log(s, AV_LOG_ERROR, 'SelectObject (error %d)'#10, GetLastError);
-    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('SelectObject (error %d)'#10, [GetLastError]));
-    Result := AVERROR_IO;
-    Exit;
-  end;
-
+//  FillChar(bmp, sizeof(BITMAP), 0);
+//  if GetObject(ctx.hbmp, sizeof(BITMAP), @bmp) = 0 then
+//  begin
+//    errcode := GetLastError;
+//    if errcode <> 0 then
+//    begin
+//      errmsg := SysErrorMessage(errcode);
+//      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('GetObject (error %d: %s)'#10, [errcode, errmsg]));
+//      Result := AVERROR_IO;
+//      Exit;
+//    end
+//    else
+//    begin
+//      bmp.bmType := 0;
+//      bmp.bmWidth := ctx.width;
+//      bmp.bmHeight := ctx.height;
+//      bmp.bmWidthBytes := ctx.width * ctx.bpp div 8;
+//      bmp.bmPlanes := 1;
+//      bmp.bmBitsPixel := ctx.bpp;
+//      bmp.bmBits := nil;
+//      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llWarning,
+//               Format('GetObject failed. Force Bitmap type %d, size %dx%dx%u, ' +
+//               '%u planes of width %d bytes'#10,
+//               [bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
+//               bmp.bmPlanes, bmp.bmWidthBytes]));
+//    end;
+//  end
+//  else
+//      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llDebug,
+//               Format('Using Bitmap type %d, size %dx%dx%u, ' +
+//               '%u planes of width %d bytes'#10,
+//               [bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
+//               bmp.bmPlanes, bmp.bmWidthBytes]));
+//  if SelectObject(ctx.window_hdc, ctx.hbmp) = 0 then
+//  begin
+//    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('SelectObject (error %d)'#10, [GetLastError]));
+//    Result := AVERROR_IO;
+//    Exit;
+//  end;
+//
 //  ===============================================
 (* Get info from the bitmap *)
   FillChar(Mem_bmp, sizeof(BITMAP), 0);
-  { TODO 1 :
-Problem !
-Exit here, I/O error
-Log inference if don't set OnLog then there is nothing error... }
   if GetObject(ctx.Hbmp_Mem, sizeof(BITMAP), @Mem_bmp) = 0 then
   begin
     errcode := GetLastError;
@@ -559,7 +632,6 @@ Log inference if don't set OnLog then there is nothing error... }
     if errcode <> 0 then
     begin
       errmsg := SysErrorMessage(errcode);
-//      av_log(s, AV_LOG_ERROR, 'Mem GetObject (error %d: %s)'#10, errcode, PAnsiChar(AnsiString(errmsg)));
       WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Mem GetObject (error %d: %s)'#10, [errcode, errmsg]));
       Result := AVERROR_IO;
       Exit;
@@ -567,17 +639,12 @@ Log inference if don't set OnLog then there is nothing error... }
     else
     begin
       Mem_bmp.bmType := 0;
-      Mem_bmp.bmWidth := ctx.width;
-      Mem_bmp.bmHeight := ctx.height;
-      Mem_bmp.bmWidthBytes := ctx.width * ctx.bpp div 8;
+      Mem_bmp.bmWidth := screenwidth;
+      Mem_bmp.bmHeight := screenheight;
+      Mem_bmp.bmWidthBytes := screenwidth * ctx.bpp div 8;
       Mem_bmp.bmPlanes := 1;
       Mem_bmp.bmBitsPixel := ctx.bpp;
       Mem_bmp.bmBits := nil;
-//      av_log(s, AV_LOG_WARNING,
-//             'Mem GetObject failed. Force Bitmap type %d, size %dx%dx%u, ' +
-//             '%u planes of width %d bytes'#10,
-//             Mem_bmp.bmType, Mem_bmp.bmWidth, Mem_bmp.bmHeight, Mem_bmp.bmBitsPixel,
-//             Mem_bmp.bmPlanes, Mem_bmp.bmWidthBytes);
       WriteLog(GetCurrentThreadId, ctx.ParentGUID, llWarning,
                Format('Mem GetObject failed. Force Bitmap type %d, size %dx%dx%u, ' +
                '%u planes of width %d bytes'#10,
@@ -586,11 +653,6 @@ Log inference if don't set OnLog then there is nothing error... }
     end;
   end
   else
-//    av_log(s, AV_LOG_DEBUG,
-//           'Mem Using Bitmap type %d, size %dx%dx%u, ' +
-//           '%u planes of width %d bytes'#10,
-//           Mem_bmp.bmType, Mem_bmp.bmWidth, Mem_bmp.bmHeight, Mem_bmp.bmBitsPixel,
-//           Mem_bmp.bmPlanes, Mem_bmp.bmWidthBytes);
     WriteLog(GetCurrentThreadId, ctx.ParentGUID, llDebug,
              Format('Mem Using Bitmap type %d, size %dx%dx%u, ' +
              '%u planes of width %d bytes'#10,
@@ -598,7 +660,6 @@ Log inference if don't set OnLog then there is nothing error... }
               Mem_bmp.bmPlanes, Mem_bmp.bmWidthBytes]));
   if SelectObject(ctx.Mem_hdc, ctx.Hbmp_Mem) = 0 then
   begin
-//    av_log(s, AV_LOG_ERROR, 'Mem SelectObject (error %d)'#10, GetLastError);
     WriteLog(GetCurrentThreadId, ctx.ParentGUID, llError, Format('Mem SelectObject (error %d)'#10, [GetLastError]));
     Result := AVERROR_IO;
     Exit;
@@ -611,12 +672,12 @@ Log inference if don't set OnLog then there is nothing error... }
     24: input_pixfmt := PIX_FMT_BGR24;
     32: input_pixfmt := PIX_FMT_RGB32;
   else
-//    av_log(s, AV_LOG_ERROR, 'image depth %u not supported ... aborting'#10, ctx.bpp);
     WriteLog(GetCurrentThreadId, ctx.ParentGUID, llError, Format('image depth %u not supported ... aborting'#10, [ctx.bpp]));
     Result := -1;
     Exit;
   end;
-  ctx.size := bmp.bmWidthBytes * bmp.bmHeight * bmp.bmPlanes;
+//  ctx.size := bmp.bmWidthBytes * bmp.bmHeight * bmp.bmPlanes;
+  ctx.size := (fwidth * ctx.bpp div 8) * fheight * 1;
 
   st := av_new_stream(s, 0);
   if st = nil then
@@ -630,18 +691,20 @@ Log inference if don't set OnLog then there is nothing error... }
   begin
     ap.time_base.num := 1;
     ap.time_base.den := 15;
-//    av_log(s, AV_LOG_INFO, 'frame rate assume as %d/%d.'#10, ap.time_base.num, ap.time_base.den);
     WriteLog(GetCurrentThreadId, ctx.ParentGUID, llInfo, Format('frame rate assume as %d/%d.'#10, [ap.time_base.num, ap.time_base.den]));
   end;
 
-//  if (s.show_frame <> 0) and (s.window_handle = 0) then
-  if ctx.show_frame <> 0 then
-    ctx.frame := TFrameForm.Create(ctx);
+//  if ctx.show_frame <> 0 then
+  ctx.frame := TFrameForm.Create(ctx);
+  if show_frame <> 0 then
+    ctx.frame.Show
+  else
+    ctx.frame.Hide;
 
   st.codec.codec_type := AVMEDIA_TYPE_VIDEO;
   st.codec.codec_id   := CODEC_ID_RAWVIDEO;
-  st.codec.width      := ctx.width;
-  st.codec.height     := ctx.height;
+  st.codec.width      := fwidth;
+  st.codec.height     := fheight;
   st.codec.pix_fmt    := input_pixfmt;
   st.codec.time_base  := ap.time_base;
   st.codec.bit_rate   := Round(ctx.size * 1 / av_q2d(ap.time_base) * 8);
@@ -661,11 +724,8 @@ Log inference if don't set OnLog then there is nothing error... }
   ctx.time_frame := Round(av_gettime / av_q2d(ap.time_base));
 
   if show_title then
-//    av_log(s, AV_LOG_INFO, 'Found window %s, ', title);
     WriteLog(GetCurrentThreadId, ctx.ParentGUID, llInfo, Format('Found window %s, ', [title]));
-//  av_log(s, AV_LOG_INFO, 'ready for capturing %ux%ux%u at (%u,%u)'#10,
-//         ctx.width, ctx.height, ctx.bpp, ctx.x_off, ctx.y_off);
-  WriteLog(GetCurrentThreadId, ctx.ParentGUID, llInfo, Format('ready for capturing %ux%ux%u at (%u,%u)'#10, [ctx.width, ctx.height, ctx.bpp, ctx.x_off, ctx.y_off]));
+  WriteLog(GetCurrentThreadId, ctx.ParentGUID, llInfo, Format('ready for capturing %ux%ux%u at (%u,%u)'#10, [fwidth, fheight, ctx.bpp, fleft, ftop]));
 
   Result := 0;
 end;
@@ -680,6 +740,9 @@ var
   info: ICONINFO;
   x, y: Longint;
   rect: TRect;
+
+  window_handle: HWND;
+  x_off, y_off:Integer;
 begin
   s := s1.priv_data;
 
@@ -719,39 +782,19 @@ begin
 //  pkt.pts := curtime;
 
   //============================================================
-  if Assigned(s.OnCheckGrabMode) then
-  begin
-    s.OnCheckGrabMode(s.GrabMode);  //you can change GrabMode in this callback
-  end;
   (* Blit screen grab *)
-  if s.GrabMode = gmDC then      //Capture Screen use DC directly
+  if not GrabBmp(s) then
   begin
-    if not BitBlt(s.window_hdc, 0, 0, s.width, s.height,
-                  s.source_hdc, s.x_off, s.y_off, SRCCOPY) then
-    begin
-      av_log(s1, AV_LOG_ERROR, 'Failed to capture image (error %d)'#10, GetLastError);
-      Result := -1;
-      Exit;
-    end;
-  end
-  else
-  begin
-    if not PrintWindow(s.window_handle, s.Mem_hdc, 0) then
-    begin
-  //    av_log(s1, AV_LOG_ERROR, 'PrintWindow to Mem_hdc failed (error %d)'#10, GetLastError);
-      WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('PrintWindow to Mem_hdc failed (error %d)'#10, [GetLastError]));
-      Result := -1;
-      Exit;
-    end;
-    if not BitBlt(s.window_hdc, 0, 0, s.width, s.height,
-                  s.Mem_hdc, s.x_off, s.y_off, SRCCOPY) then
-    begin
-  //    av_log(s1, AV_LOG_ERROR, 'Failed to BitBlt image (error %d)'#10, GetLastError);
-      WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('Failed to BitBlt image (error %d)'#10, [GetLastError]));
-      Result := -1;
-      Exit;
-    end;
+    Result := AVERROR_IO;
+    Exit;
   end;
+  if WaitForSingleObject(s.Mutex, INFINITE) = WAIT_OBJECT_0 then
+  begin
+    window_handle := s.CaptureForm.Handle;
+    x_off := s.CaptureForm.Left;
+    y_off := s.CaptureForm.Top;
+  end;
+  ReleaseMutex(s.Mutex);
   //============================================================
 
   if s.cursor <> 0 then
@@ -772,15 +815,15 @@ begin
             x := ci.ptScreenPos.x - Longint(info.xHotspot);
             y := ci.ptScreenPos.y - Longint(info.yHotspot);
 
-            if s.window_handle <> 0 then
+            if window_handle <> 0 then
             begin
-              if ((s.client <> 0) and GetClientRect(s.window_handle, rect)) or
-                ((s.client = 0) and GetWindowRect(s.window_handle, rect)) then
+              if ((s.client <> 0) and GetClientRect(window_handle, rect)) or
+                ((s.client = 0) and GetWindowRect(window_handle, rect)) then
               begin
                 if s.client <> 0 then
                 begin
-                  ClientToScreen(s.window_handle, rect.TopLeft);
-                  ClientToScreen(s.window_handle, rect.BottomRight);
+                  ClientToScreen(window_handle, rect.TopLeft);
+                  ClientToScreen(window_handle, rect.BottomRight);
                 end;
                 //av_log(s1, AV_LOG_DEBUG, 'Pos(%d,%d) . (%d,%d)'#10, x, y, x - rect.left, y - rect.top);
                 Dec(x, rect.left);
@@ -794,8 +837,8 @@ begin
               end;
             end;
 
-            Dec(x, s.x_off);
-            Dec(y, s.y_off);
+            Dec(x, x_off);
+            Dec(y, y_off);
             if not DrawIcon(s.window_hdc, x, y, icon) then
             begin
 //              av_log(s1, AV_LOG_ERROR, 'Couldn''t draw icon: error %d'#10, GetLastError);
@@ -844,12 +887,18 @@ end;
 function win32grab_read_close(s: PAVFormatContext): Integer; cdecl;
 var
   ctx: Pwin32_grab;
+  window_handle: HWND;
 begin
   ctx := s.priv_data;
+  if WaitForSingleObject(ctx.Mutex, INFINITE) = WAIT_OBJECT_0 then
+  begin
+    window_handle := ctx.CaptureForm.Handle;
+  end;
+  ReleaseMutex(ctx.Mutex);
 
   // release resource
   if ctx.source_hdc <> 0 then
-    ReleaseDC(ctx.window_handle, ctx.source_hdc);
+    ReleaseDC(window_handle, ctx.source_hdc);
   if ctx.window_hdc <> 0 then
     DeleteDC(ctx.window_hdc);
 //====================================
