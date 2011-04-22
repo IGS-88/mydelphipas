@@ -36,6 +36,7 @@ uses
 
 const
   AUDIO_BLOCK_SIZE = 4096;
+  EMPTY_BLOCK_SIZE = 1024;
 
 type
   Pprocesswave_grab = ^Tprocesswave_grab;
@@ -64,9 +65,6 @@ type
     time_packetlast: Int64;       (* last packet last time *)
     sample_usPerByte: Double;         (* one byte = sample_usPerByte microsecond*)
   end;
-var
-  ctxDll: Pprocesswave_grab;
-
 
 // wave Data from dll   Stdcall
 procedure GetAudioDataFromDLL(name       : pchar;
@@ -75,16 +73,20 @@ procedure GetAudioDataFromDLL(name       : pchar;
 type
   PPAVPacketList = ^PAVPacketList;
 var
-  mem : TMemoryStream;
+//  mem : TMemoryStream;
   ctx: Pprocesswave_grab;
   LBytes: DWORD;
   ppktl: PPAVPacketList;
   pktl_next: PAVPacketList;
 begin
-  mem := TMemoryStream.Create;
-  mem.Write(messageBuf^, messageLen);
-  mem.Position := 0;
-  mem.Read(ctx,SizeOf(Pprocesswave_grab));
+//  mem := TMemoryStream.Create;
+//  mem.Write(messageBuf^, messageLen);
+//  mem.Position := 0;
+//  mem.Read(ctx,SizeOf(Pprocesswave_grab));
+
+//CopyMemory(@ctx, messageBuf, SizeOf(Pprocesswave_grab));
+  Move( messageBuf^, ctx,SizeOf(Pprocesswave_grab));
+  Inc(DWORD(messageBuf),SizeOf(Pprocesswave_grab));
 
   if (DWORD(ctx) <> 0) and (ctx.Started = 1) then
   begin
@@ -109,8 +111,8 @@ begin
           end;
 
           // write wave data
-          mem.Read(pktl_next.pkt.data^, LBytes);
-
+//          mem.Read(pktl_next.pkt.data^, LBytes);
+            Move(messageBuf^, pktl_next.pkt.data^, LBytes);
           // add packet to list
           ppktl := @ctx.pktl;
           while Assigned(ppktl^) do
@@ -120,7 +122,7 @@ begin
           ReleaseMutex(ctx.mutex);
         end;
   end;
-  FreeAndNil(mem);
+//  FreeAndNil(mem);
 end;
 
 //ask format   cmd = 0
@@ -158,6 +160,7 @@ begin
   result := false;
   SendIpcMessage(PAnsiChar(ipcnameCMD), mem.Memory, mem.Size,
                   @result, sizeOf(result));
+  mem.Free;
 end;
 
 //send voice  cmd = 2
@@ -257,7 +260,7 @@ var
   param: string;
   N, V: string;
 begin
-  ctx := s.priv_data;        ctxDll:= s.priv_data;  ctxDll.s := s;
+  ctx := s.priv_data;        
   ctx.s := s;
 
   ctx.frame_size := AUDIO_BLOCK_SIZE;
@@ -419,6 +422,7 @@ var
   emptyPkt: TAVPacket;
   delay: Int64;
 begin
+
   ctx := s.priv_data;
 
   // TODO: could we miss one wave buffer?
@@ -464,21 +468,22 @@ begin
     else
     begin
     // create packet
-      if av_new_packet(@emptyPkt, 1764) < 0 then
+
+      if av_new_packet(@emptyPkt, EMPTY_BLOCK_SIZE) < 0 then
       begin
         ctx.Stoped := 1;
         Result:= AVERROR_NOMEM;
         Exit;
       end;
     // write wave data
-      FillMemory(emptyPkt.data, 1764, 0);
+      FillMemory(emptyPkt.data, EMPTY_BLOCK_SIZE, 0);
 
     // add packet
       pkt^ := emptyPkt;
 
       Inc(ctx.time_packetstart, ctx.time_packetlast);
       ctx.time_packetlast:= Round(pkt.size * ctx.sample_usPerByte);
-    end;  
+    end;
 
     ReleaseMutex(ctx.mutex);
 

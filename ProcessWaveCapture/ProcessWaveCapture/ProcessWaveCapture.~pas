@@ -16,7 +16,7 @@ uses
 procedure register_processwavecapture;
 function InjectTarget(TargetPid: DWORD): Boolean;
 function AskFormat(TargetPid: DWORD): string;
-function Sendvoice(TargetPid: DWORD): Boolean;
+function SendVoice(TargetPid: DWORD; voice : Boolean): Boolean;
 
 implementation
 
@@ -36,6 +36,7 @@ uses
 
 const
   AUDIO_BLOCK_SIZE = 4096;
+  EMPTY_BLOCK_SIZE = 1024;
 
 type
   Pprocesswave_grab = ^Tprocesswave_grab;
@@ -47,7 +48,7 @@ type
     sample_fmt: TSampleFormat;
     codec_id: TCodecID;
     frame_size: Integer;
-    voice: Integer;          //target audio enable(1) or disable(0), default 1
+    voice: Boolean;          //target audio enable(1) or disable(0), default 1
 
     // status
     Started: Integer;
@@ -64,9 +65,6 @@ type
     time_packetlast: Int64;       (* last packet last time *)
     sample_usPerByte: Double;         (* one byte = sample_usPerByte microsecond*)
   end;
-var
-  ctxDll: Pprocesswave_grab;
-
 
 // wave Data from dll   Stdcall
 procedure GetAudioDataFromDLL(name       : pchar;
@@ -123,33 +121,7 @@ begin
   FreeAndNil(mem);
 end;
 
-//send ctx
-//ctx : a pointer of Tprocesswave_grab
-function SendCTX(TargetPid: DWORD; ctx: Pprocesswave_grab): Boolean;
-var
-  ipcnameCMD : string;
-begin
-  ipcnameCMD:= 'processwavecapture_CMD_' + inttostr(TargetPid);
-  result := false;
-  SendIpcMessage(PAnsiChar(ipcnameCMD), @ctx, SizeOf(Pprocesswave_grab),
-                  @result, sizeOf(result));
-end;
-
-//send voice
-//
-function Sendvoice(TargetPid: DWORD): Boolean;
-var
-  ipcnameCMD : string;
-  CMD: DWORD;
-begin
-  CMD:= INFINITE;
-  ipcnameCMD:= 'processwavecapture_CMD_' + inttostr(TargetPid);
-  result := false;
-  SendIpcMessage(PAnsiChar(ipcnameCMD), @CMD, SizeOf(CMD),
-                  @result, sizeOf(result));
-end;
-
-//ask format
+//ask format   cmd = 0
 //return as 'r=44100;c=2;f=16;'
 function AskFormat(TargetPid: DWORD): string;
 var
@@ -160,12 +132,49 @@ begin
   Result:= '';
   CMD:= 0;
   ipcnameCMD:= 'processwavecapture_CMD_' + inttostr(TargetPid);
-  FillMemory(@fmt, SizeOf(fmt), 0);
   SendIpcMessage(PAnsiChar(ipcnameCMD), @CMD, SizeOf(CMD),
                   @fmt, sizeOf(fmt));
   if fmt.nSamplesPerSec <> 0 then
   Result:= 'r='+inttostr(fmt.nSamplesPerSec)+';c='+inttostr(fmt.nChannels)
             +';f='+inttostr(fmt.wBitsPerSample)+';' ;
+end;
+
+//send ctx   cmd = 1
+//ctx : a pointer of Tprocesswave_grab
+function SendCTX(TargetPid: DWORD; ctx: Pprocesswave_grab): Boolean;
+var
+  CMD: DWORD;
+  ipcnameCMD : string;
+  mem : TMemoryStream;
+begin
+  CMD:= 1;
+  mem:= TMemoryStream.Create;
+  mem.Write(CMD, SizeOf(CMD));
+  mem.Write(ctx, SizeOf(ctx));
+
+  ipcnameCMD:= 'processwavecapture_CMD_' + inttostr(TargetPid);
+  result := false;
+  SendIpcMessage(PAnsiChar(ipcnameCMD), mem.Memory, mem.Size,
+                  @result, sizeOf(result));
+end;
+
+//send voice  cmd = 2
+//voice
+function SendVoice(TargetPid: DWORD; voice : Boolean): Boolean;
+var
+  ipcnameCMD : string;
+  CMD: DWORD;
+  mem : TMemoryStream;
+begin
+  CMD:= 2;
+  mem:= TMemoryStream.Create;
+  mem.Write(CMD, SizeOf(CMD));
+  mem.Write(voice, SizeOf(voice));
+
+  ipcnameCMD:= 'processwavecapture_CMD_' + inttostr(TargetPid);
+  result := false;
+  SendIpcMessage(PAnsiChar(ipcnameCMD), mem.Memory, mem.Size,
+                  @result, sizeOf(result));
 end;
 
 //inject target
@@ -246,14 +255,14 @@ var
   param: string;
   N, V: string;
 begin
-  ctx := s.priv_data;        ctxDll:= s.priv_data;  ctxDll.s := s;
+  ctx := s.priv_data;        
   ctx.s := s;
 
   ctx.frame_size := AUDIO_BLOCK_SIZE;
 
   ctx.pid := 0;
 
-  ctx.voice:= 1;
+  ctx.voice:= True;
   // default CD quality
   ctx.sample_rate := 44100;
   ctx.channels := 2;
@@ -265,7 +274,7 @@ begin
   //  r=int: sample rate, default 44100 of (8000, 11025, 22050, 44100)
   //  c=int: channels, default 2 of (1, 2)
   //  f=int: sample format, default 16 of (8, 16)
-  //  voice=int: target audio enable(1) or disable(0), default 1
+  //  voice=boolean: target audio enable(1) or disable(0), default 1
   //  pause_pointer=int: integer value of pause flag pointer
 
   // parse parmameters
@@ -293,7 +302,7 @@ begin
       ctx.Paused := Pointer(StrToIntDef(V, 0))
     else if SameText(N, 'voice') then
       // pause flag pointer
-      ctx.voice := StrToIntDef(V, 1)
+      ctx.voice := StrToBoolDef(V,True);
   end;
 
   // check sample rate
@@ -355,6 +364,14 @@ begin
     Exit;
   end;
 
+  // send voice
+  if not SendVoice(ctx.pid, ctx.voice) then
+  begin
+    ReleaseResource(ctx);
+    Result := AVERROR_IO;
+    Exit;
+  end;
+
   // new stream
   st := av_new_stream(s, 0);
   if st = nil then
@@ -400,6 +417,7 @@ var
   emptyPkt: TAVPacket;
   delay: Int64;
 begin
+
   ctx := s.priv_data;
 
   // TODO: could we miss one wave buffer?
@@ -445,21 +463,22 @@ begin
     else
     begin
     // create packet
-      if av_new_packet(@emptyPkt, 1764) < 0 then
+
+      if av_new_packet(@emptyPkt, EMPTY_BLOCK_SIZE) < 0 then
       begin
         ctx.Stoped := 1;
         Result:= AVERROR_NOMEM;
         Exit;
       end;
     // write wave data
-      FillMemory(emptyPkt.data, 1764, 0);
+      FillMemory(emptyPkt.data, EMPTY_BLOCK_SIZE, 0);
 
     // add packet
       pkt^ := emptyPkt;
 
       Inc(ctx.time_packetstart, ctx.time_packetlast);
       ctx.time_packetlast:= Round(pkt.size * ctx.sample_usPerByte);
-    end;  
+    end;
 
     ReleaseMutex(ctx.mutex);
 
