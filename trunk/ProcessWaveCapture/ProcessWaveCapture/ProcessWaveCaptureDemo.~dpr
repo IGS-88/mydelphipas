@@ -1,0 +1,15 @@
+program ProcessWaveCaptureDemo;
+
+uses
+  Forms,
+  WaveCaptureFrm in 'WaveCaptureFrm.pas' {frmWaveCapture},
+
+  ProcessWaveCapture in 'ProcessWaveCapture.pas';
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.CreateForm(TfrmWaveCapture, frmWaveCapture);
+  Application.Run;
+end.
