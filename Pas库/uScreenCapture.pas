@@ -1,4 +1,4 @@
-unit ScreenCapture;
+unit uScreenCapture;
 
 interface
 
@@ -8,19 +8,9 @@ uses
   Classes,
   Graphics,
   Controls,
-  Forms;
-type
-//======================================
-  TGrabMode = (gmDC, gmPW); (* The grab mode, gmDC use GetDC and gmPW use printwindow function*)
-  PCaptureForm = ^TCaptureForm;
-  TCaptureForm = record
-    Handle: HWND;
-    Left, Top: Integer;
-    Width, Height: Integer;
-    GrabMode: TGrabMode;
-    ShowFrame: Integer;
-  end;
-//======================================
+  Forms,
+  uCaptureTypes;
+
 procedure register_screencapture;
 implementation
 

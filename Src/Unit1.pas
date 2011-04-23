@@ -4,8 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, uScreenCapture, StdCtrls, ExtCtrls, uLogger, uMerger,
-  AudioCapture, AudioTask, MyUtils ,TlHelp32, ActnList;
+  Dialogs, uCapture, StdCtrls, ExtCtrls, uLogger, {uMerger,}
+  AudioCapture, AudioTask, MyUtils ,TlHelp32, ActnList, uCaptureTypes;
 
 type
   TForm1 = class(TForm)
@@ -31,6 +31,7 @@ type
     edt4: TEdit;
     edt5: TEdit;
     btn9: TButton;
+    btn10: TButton;
     procedure FormCreate(Sender: TObject);
     procedure btn1Click(Sender: TObject);
     procedure btn3Click(Sender: TObject);
@@ -42,8 +43,10 @@ type
     procedure act_pointExecute(Sender: TObject);
     procedure btn8Click(Sender: TObject);
     procedure btn9Click(Sender: TObject);
+    procedure btn10Click(Sender: TObject);
   private
     { Private declarations }
+    s: TTerminateInfo;
     procedure OnLog(Sender: TObject; const ALogInfo: uLogger.TLogInfo);
     procedure OnPreviewBitmap(Sender: TObject; const APreviewInfo: TPreviewInfo);
   public
@@ -57,7 +60,7 @@ var
   TargetPID: Cardinal= 0;
 
   VIO: TVideoInputOption;
-  Merger: TMerger;
+//  Merger: TMerger;
 
 implementation
 
@@ -93,9 +96,7 @@ begin
   ScreenCapture1.UseDefaultOO;
   if not ScreenCapture1.Start('ScreenCapture1.mp4') then
   ShowMessage('Error');
-
   StartTask(TargetPID);
-
 end;
 
 procedure TForm1.btn3Click(Sender: TObject);
@@ -204,21 +205,26 @@ end;
 
 procedure TForm1.btn8Click(Sender: TObject);
 begin
-  if not Assigned(Merger) then
-    Merger := TMerger.Create(Self);
-  Merger.AddVideo(edt3.Text);
-  Merger.AddAudio(edt4.Text);
-  Merger.UseDefaultOO;
-  Merger.Start(edt5.Text);
+//  if not Assigned(Merger) then
+//    Merger := TMerger.Create(Self);
+//  Merger.AddVideo(edt3.Text);
+//  Merger.AddAudio(edt4.Text);
+//  Merger.UseDefaultOO;
+//  Merger.Start(edt5.Text);
 end;
 
 procedure TForm1.btn9Click(Sender: TObject);
 begin
-  if not Assigned(Merger) then
-    Merger := TMerger.Create(Self);
-  Merger.VideoStreamID := Merger.GetFirstVideoStream(edt3.Text);
-  Merger.AudioStreamID := Merger.GetFirstAudioStream(edt4.Text);
+//  if not Assigned(Merger) then
+//    Merger := TMerger.Create(Self);
+//  Merger.VideoStreamID := Merger.GetFirstVideoStream(edt3.Text);
+//  Merger.AudioStreamID := Merger.GetFirstAudioStream(edt4.Text);
 end;
 
+
+procedure TForm1.btn10Click(Sender: TObject);
+begin
+  ScreenCapture1.ResetHandle(StrToInt(Edit1.Text));
+end;
 
 end.
