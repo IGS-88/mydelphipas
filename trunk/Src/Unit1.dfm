@@ -181,6 +181,15 @@ object Form1: TForm1
     TabOrder = 17
     OnClick = btn9Click
   end
+  object btn10: TButton
+    Left = 352
+    Top = 80
+    Width = 75
+    Height = 25
+    Caption = 'btn10'
+    TabOrder = 18
+    OnClick = btn10Click
+  end
   object actlst1: TActionList
     Left = 808
     Top = 64
