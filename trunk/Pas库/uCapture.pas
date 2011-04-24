@@ -345,6 +345,17 @@ end;
 function TScreenCapture.Start(OutPutFile: WideString): Boolean;
 begin
   Result := False;
+  if FStatus = csWorking then
+  begin
+    WriteLog(GetCurrentThreadId, FID, llWarning, 'Capture is working!');
+    Exit;
+  end;
+  if FStatus = csPaused then
+  begin
+    WriteLog(GetCurrentThreadId, FID, llWarning, 'Capture is pausing, now resume!');
+    Resume;
+    Exit;
+  end;
   // Load dynamic link libraries
   if not FEncode.AVLibLoaded then
   begin
