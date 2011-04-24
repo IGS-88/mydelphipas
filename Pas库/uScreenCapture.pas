@@ -39,7 +39,7 @@ type
   TFrameForm = class;
   Pwin32_grab = ^Twin32_grab;
   Twin32_grab = record
-//    window_handle: HWND;    (* handle of the window for the grab *)
+    old_Hwnd: HWND;         (* old handle of the window for the grab. Use it in GrabBmp, check whether the Hwnd has changed *)
     source_hdc: HDC;        (* Source device context *)
     window_hdc: HDC;        (* Destination, source-compatible device context *)
     hbmp: HBITMAP;          (* Information on the bitmap captured *)
@@ -47,26 +47,21 @@ type
     Mem_hdc: HDC;           (* HDC in Memory, the same as window_hdc. PrintWindow to Mem_hdc *)//Add at 2011/3/17 by Codeup
     Hbmp_Mem: HBITMAP;      (* HBITMAP for Mem_hdc, PrintWindow WindowScreen to Mem_hdc, which selected with HBmp_Mem *)
     ParentGUID: string;     (* GUID of Parent TScreenCapture. Send this param to Log *)
-    CaptureForm: PCaptureForm;
-    Mutex: THandle;         (* *)
+    //PCaptureForm and TCaptureForm are statemented in uCaptureTypes.pas
+    CaptureForm: PCaptureForm;  (* The Pointer of a virtual Form that contain the informations of Capture. Such as handle and offset...*)
+    Mutex: THandle;         (* The Mutex that control the sync of CaptureForm, it will be visited by here and uCapture.pas *)
     //=======================================================
     time_base: TAVRational; (* Time base *)
     time_frame: Int64;      (* Current time *)
     time_start: Int64;
     Started: Integer;
 
-//    x_off: Integer;         (* Horizontal top-left corner coordinate *)
-//    y_off: Integer;         (* Vertical top-left corner coordinate *)
     cursor: Integer;        (* Also capture cursor *)
 
     size: Integer;          (* Size in bytes of the grab frame *)
-//    width: Integer;         (* Width of the grab frame *)
-//    height: Integer;        (* Height of the grab frame *)
     bpp: Integer;           (* Bits per pixel of the grab frame *)
 
     client: Integer;        // only capture client of window
-
-//    show_frame: PInteger;    // show flashing frame
     frame: TFrameForm;      // frame form
   end;
 
@@ -173,10 +168,12 @@ var
   width, height: Integer;
   x_off, y_off: Integer;
   bmp: BITMAP;
+  Mem_bmp: BITMAP;
   errcode: Integer;
   errmsg: string;
   GrabMode: TGrabMode;
   window_handle: HWND;
+  screenwidth, screenheight: Integer;
 begin
   if WaitForSingleObject(s.Mutex, INFINITE) = WAIT_OBJECT_0 then
   begin
@@ -188,6 +185,94 @@ begin
     window_handle := s.CaptureForm.Handle;
   end;
   ReleaseMutex(s.Mutex);
+
+  if s.old_Hwnd <> window_handle then
+  begin
+    // ReCreate source_hdc and reset old_Hwnd
+    if s.source_hdc <> 0 then
+    ReleaseDC(window_handle, s.source_hdc);
+    if s.source_hdc <> 0 then
+    DeleteDC(s.source_hdc);
+    if s.client <> 0 then
+      s.source_hdc := GetDC(window_handle)
+    else
+      s.source_hdc := GetWindowDC(window_handle);
+    if s.source_hdc = 0 then
+    begin
+      WriteLog(GetCurrentThreadId, s.ParentGUID, llerror, Format('Couldn''t get window DC (error %d)'#10, [GetLastError]));
+      Result := False;
+      Exit;
+    end;
+    s.bpp := GetDeviceCaps(s.source_hdc, BITSPIXEL);
+
+    if s.window_hdc <> 0 then
+      DeleteDC(s.window_hdc);
+    //====================================
+    if s.Mem_hdc <> 0 then
+      DeleteDC(s.Mem_hdc);
+    if s.Hbmp_Mem <> 0 then
+      DeleteObject(s.Hbmp_Mem);
+    //====================================
+    if s.hbmp <> 0 then
+      DeleteObject(s.hbmp);
+
+    s.window_hdc := CreateCompatibleDC(s.source_hdc);
+    if s.window_hdc = 0 then
+    begin
+      WriteLog(GetCurrentThreadId, s.ParentGUID, llerror, Format('Screen DC CreateCompatibleDC (error %d)'#10, [GetLastError]));
+      Result := False;
+      Exit;
+    end;
+
+    s.Mem_hdc := CreateCompatibleDC(s.source_hdc);
+    if s.Mem_hdc = 0 then
+    begin
+      WriteLog(GetCurrentThreadId, s.ParentGUID, llerror, Format('Mem DC CreateCompatibleDC (error %d)'#10, [GetLastError]));
+      Result := False;
+      Exit;
+    end;
+    screenwidth := GetDeviceCaps(GetDC(0), HORZRES);
+    screenheight := GetDeviceCaps(GetDC(0), VERTRES);
+    s.Hbmp_Mem := CreateCompatibleBitmap(s.source_hdc, screenwidth, screenheight);
+    if s.Hbmp_Mem = 0 then
+    begin
+      WriteLog(GetCurrentThreadId, s.ParentGUID, llerror, Format('Mem DC CreateCompatibleBitmap (error %d)'#10, [GetLastError]));
+      Result := False;
+      Exit;
+    end;
+    (* Get info from the bitmap *)
+    FillChar(Mem_bmp, sizeof(BITMAP), 0);
+    if GetObject(s.Hbmp_Mem, sizeof(BITMAP), @Mem_bmp) = 0 then
+    begin
+      errcode := GetLastError;
+      errcode := 0;   //强制更改GetLastError的结果，不影响后续工作。
+      if errcode <> 0 then
+      begin
+        errmsg := SysErrorMessage(errcode);
+        WriteLog(GetCurrentThreadId, s.ParentGUID, llerror, Format('Mem GetObject (error %d: %s)'#10, [errcode, errmsg]));
+        Result := False;
+        Exit;
+      end
+      else
+      begin
+        Mem_bmp.bmType := 0;
+        Mem_bmp.bmWidth := screenwidth;
+        Mem_bmp.bmHeight := screenheight;
+        Mem_bmp.bmWidthBytes := screenwidth * s.bpp div 8;
+        Mem_bmp.bmPlanes := 1;
+        Mem_bmp.bmBitsPixel := s.bpp;
+        Mem_bmp.bmBits := nil;
+      end;
+    end;
+    if SelectObject(s.Mem_hdc, s.Hbmp_Mem) = 0 then
+    begin
+      WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('Mem SelectObject (error %d)'#10, [GetLastError]));
+      Result := False;
+      Exit;
+    end;
+
+    s.old_Hwnd := window_handle;
+  end;
 
   if s.hbmp <> 0 then
   begin
@@ -207,6 +292,7 @@ begin
   if GetObject(s.hbmp, sizeof(BITMAP), @bmp) = 0 then
   begin
     errcode := GetLastError;
+    errcode := 0;
     if errcode <> 0 then
     begin
       errmsg := SysErrorMessage(errcode);
@@ -223,18 +309,8 @@ begin
       bmp.bmPlanes := 1;
       bmp.bmBitsPixel := s.bpp;
       bmp.bmBits := nil;
-      {WriteLog(GetCurrentThreadId, s.ParentGUID, llWarning,
-               Format('GetObject failed. Force Bitmap type %d, size %dx%dx%u, ' +
-               '%u planes of width %d bytes'#10,
-               [bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
-               bmp.bmPlanes, bmp.bmWidthBytes]));}
     end;
   end;
-      {WriteLog(GetCurrentThreadId, s.ParentGUID, llDebug,
-               Format('Using Bitmap type %d, size %dx%dx%u, ' +
-               '%u planes of width %d bytes'#10,
-               [bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
-               bmp.bmPlanes, bmp.bmWidthBytes]));}
 
   if SelectObject(s.window_hdc, s.hbmp) = 0 then
   begin
@@ -246,6 +322,7 @@ begin
 
   if GrabMode = gmDC then
   begin
+    //Grab the image
     if not BitBlt(s.window_hdc, 0, 0, width, height,
                   s.source_hdc, x_off, y_off, SRCCOPY) then
     begin
@@ -496,6 +573,7 @@ begin
     Result := AVERROR_IO;
     Exit;
   end;
+  ctx.old_Hwnd := window_handle;
 
   screenwidth := GetDeviceCaps(GetDC(0), HORZRES);
   screenheight := GetDeviceCaps(GetDC(0), VERTRES);
@@ -563,56 +641,6 @@ begin
     Exit;
   end;
 
-//  ctx.hbmp := CreateCompatibleBitmap(ctx.source_hdc, ctx.width, ctx.height);
-//  if ctx.hbmp = 0 then
-//  begin
-//    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('Screen DC CreateCompatibleBitmap (error %d)'#10, [GetLastError]));
-//    Result := AVERROR_IO;
-//    Exit;
-//  end;
-
-  (* Get info from the bitmap *)
-//  FillChar(bmp, sizeof(BITMAP), 0);
-//  if GetObject(ctx.hbmp, sizeof(BITMAP), @bmp) = 0 then
-//  begin
-//    errcode := GetLastError;
-//    if errcode <> 0 then
-//    begin
-//      errmsg := SysErrorMessage(errcode);
-//      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('GetObject (error %d: %s)'#10, [errcode, errmsg]));
-//      Result := AVERROR_IO;
-//      Exit;
-//    end
-//    else
-//    begin
-//      bmp.bmType := 0;
-//      bmp.bmWidth := ctx.width;
-//      bmp.bmHeight := ctx.height;
-//      bmp.bmWidthBytes := ctx.width * ctx.bpp div 8;
-//      bmp.bmPlanes := 1;
-//      bmp.bmBitsPixel := ctx.bpp;
-//      bmp.bmBits := nil;
-//      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llWarning,
-//               Format('GetObject failed. Force Bitmap type %d, size %dx%dx%u, ' +
-//               '%u planes of width %d bytes'#10,
-//               [bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
-//               bmp.bmPlanes, bmp.bmWidthBytes]));
-//    end;
-//  end
-//  else
-//      WriteLog(GetCurrentThreadId, ctx.ParentGUID, llDebug,
-//               Format('Using Bitmap type %d, size %dx%dx%u, ' +
-//               '%u planes of width %d bytes'#10,
-//               [bmp.bmType, bmp.bmWidth, bmp.bmHeight, bmp.bmBitsPixel,
-//               bmp.bmPlanes, bmp.bmWidthBytes]));
-//  if SelectObject(ctx.window_hdc, ctx.hbmp) = 0 then
-//  begin
-//    WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, Format('SelectObject (error %d)'#10, [GetLastError]));
-//    Result := AVERROR_IO;
-//    Exit;
-//  end;
-//
-//  ===============================================
 (* Get info from the bitmap *)
   FillChar(Mem_bmp, sizeof(BITMAP), 0);
   if GetObject(ctx.Hbmp_Mem, sizeof(BITMAP), @Mem_bmp) = 0 then
@@ -776,6 +804,7 @@ begin
   if not GrabBmp(s) then
   begin
     Result := AVERROR_IO;
+    WriteLog(GetCurrentThreadId, s.ParentGUID, llError, Format('Failed to BitBlt image (error %d)'#10, [GetLastError]));
     Exit;
   end;
   if WaitForSingleObject(s.Mutex, INFINITE) = WAIT_OBJECT_0 then

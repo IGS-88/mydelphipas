@@ -201,6 +201,7 @@ begin
   GetCursorPos(pos);
   hd := WindowFromPoint(pos);
   ShowMessage(IntToStr(hd));
+  Edit1.Text := IntToStr(hd);
 end;
 
 procedure TForm1.btn8Click(Sender: TObject);
@@ -224,7 +225,9 @@ end;
 
 procedure TForm1.btn10Click(Sender: TObject);
 begin
-  ScreenCapture1.ResetHandle(StrToInt(Edit1.Text));
+//  ScreenCapture1.ResetHandle(StrToInt(Edit1.Text));
+//  ScreenCapture1.ResetGrabMode(gmPW);
+  ScreenCapture1.ResetHandle(StrToInt(Edit1.text));
 end;
 
 end.
