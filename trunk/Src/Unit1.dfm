@@ -1,6 +1,6 @@
 object Form1: TForm1
-  Left = 416
-  Top = 80
+  Left = 344
+  Top = 132
   Width = 870
   Height = 640
   Caption = 'Form1'
@@ -28,9 +28,9 @@ object Form1: TForm1
   end
   object mmo1: TMemo
     Left = 16
-    Top = 112
+    Top = 184
     Width = 473
-    Height = 313
+    Height = 241
     Lines.Strings = (
       'mmo1')
     TabOrder = 0
@@ -186,9 +186,18 @@ object Form1: TForm1
     Top = 80
     Width = 75
     Height = 25
-    Caption = 'btn10'
+    Caption = 'Change Handle'
     TabOrder = 18
     OnClick = btn10Click
+  end
+  object btn11: TButton
+    Left = 432
+    Top = 80
+    Width = 75
+    Height = 25
+    Caption = 'HideFrame'
+    TabOrder = 19
+    OnClick = btn11Click
   end
   object actlst1: TActionList
     Left = 808

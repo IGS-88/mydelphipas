@@ -43,6 +43,7 @@ type
     source_hdc: HDC;        (* Source device context *)
     window_hdc: HDC;        (* Destination, source-compatible device context *)
     hbmp: HBITMAP;          (* Information on the bitmap captured *)
+    width, height: Integer; (* The Framesize of the bitmap captured *)
     //=======================================================
     Mem_hdc: HDC;           (* HDC in Memory, the same as window_hdc. PrintWindow to Mem_hdc *)//Add at 2011/3/17 by Codeup
     Hbmp_Mem: HBITMAP;      (* HBITMAP for Mem_hdc, PrintWindow WindowScreen to Mem_hdc, which selected with HBmp_Mem *)
@@ -91,45 +92,6 @@ type
 
 function PrintWindow(SourceWindow: hwnd; Destination: hdc; nFlags: cardinal): bool; stdcall; external 'user32.dll' name 'PrintWindow';
 
-function GetCFRect(const Awin32_grab: Pwin32_grab; const ABorder: Integer; var ShowFrame: Integer): TRect;
-var
-  R: TRect;
-  window_handle: HWND;
-  x_off, y_off: Integer;
-  width, height: Integer;
-begin
-  if WaitForSingleObject(Awin32_grab.Mutex, INFINITE) = WAIT_OBJECT_0 then
-  begin
-    window_handle := Awin32_grab.CaptureForm.Handle;
-    x_off := Awin32_grab.CaptureForm.Left;
-    y_off := Awin32_grab.CaptureForm.Top;
-    width := Awin32_grab.CaptureForm.Width;
-    height := Awin32_grab.CaptureForm.Height;
-    ShowFrame := Awin32_grab.CaptureForm.ShowFrame;
-  end;
-  ReleaseMutex(Awin32_grab.Mutex);
-
-  if window_handle <> 0 then
-  begin
-    if Awin32_grab.client <> 0 then
-    begin
-      Windows.GetClientRect(window_handle, R);
-      Windows.ClientToScreen(window_handle, R.TopLeft);
-    end
-    else
-      GetWindowRect(window_handle, R);
-    Result.Left := R.Left + x_off - ABorder;
-    Result.Top := R.Top + y_off - ABorder;
-  end
-  else
-  begin
-    Result.Left := x_off - ABorder;
-    Result.Top := y_off - ABorder;
-  end;
-  Result.Right := Result.Left + width + ABorder * 2;
-  Result.Bottom := Result.Top + height + ABorder * 2;
-end;
-
 function GetTopLeft(const Awin32_grab: Pwin32_grab; const ABorder: Integer): TPoint;
 var
   R: TRect;
@@ -177,8 +139,8 @@ var
 begin
   if WaitForSingleObject(s.Mutex, INFINITE) = WAIT_OBJECT_0 then
   begin
-    width := s.CaptureForm.Width;
-    height := s.CaptureForm.Height;
+    width := s.width;
+    height := s.Height;
     x_off := s.CaptureForm.Left;
     y_off := s.CaptureForm.Top;
     GrabMode := s.CaptureForm.GrabMode;
@@ -245,7 +207,7 @@ begin
     if GetObject(s.Hbmp_Mem, sizeof(BITMAP), @Mem_bmp) = 0 then
     begin
       errcode := GetLastError;
-      errcode := 0;   //强制更改GetLastError的结果，不影响后续工作。
+//      errcode := 0;   //强制更改GetLastError的结果，不影响后续工作。
       if errcode <> 0 then
       begin
         errmsg := SysErrorMessage(errcode);
@@ -292,7 +254,7 @@ begin
   if GetObject(s.hbmp, sizeof(BITMAP), @bmp) = 0 then
   begin
     errcode := GetLastError;
-    errcode := 0;
+//    errcode := 0;
     if errcode <> 0 then
     begin
       errmsg := SysErrorMessage(errcode);
@@ -319,6 +281,7 @@ begin
     Exit;
   end;
   s.size := bmp.bmWidthBytes * bmp.bmHeight * bmp.bmPlanes;
+//  s.size := (width * s.bpp div 8) * height * 1;
 
   if GrabMode = gmDC then
   begin
@@ -398,8 +361,8 @@ constructor TFrameForm.Create(Awin32_grab: Pwin32_grab);
     P := GetTopLeft(Awin32_grab, FBorder);
     if WaitForSingleObject(Fwin32_grab.Mutex, INFINITE) = WAIT_OBJECT_0 then
     begin
-      fwidth := Fwin32_grab.CaptureForm.Width;
-      fheight := Fwin32_grab.CaptureForm.Height;
+      fwidth := Fwin32_grab.Width;
+      fheight := Fwin32_grab.Height;
     end;
     ReleaseMutex(Fwin32_grab.Mutex);
     
@@ -446,23 +409,26 @@ end;
 
 procedure TFrameForm.AdjustPosition;
 var
-  R: TRect;
-  fwidth, fheight: Integer;
+  P: TPoint;
   showframe: Integer;
 begin
   if FLock <> 0 then
     Exit;
   FLock := 1;
   try
-    R := GetCFRect(Fwin32_grab, FBorder, showframe);
-    fwidth := R.Right - r.Left;
-    fheight := r.Bottom - r.Top;
+    P := GetTopLeft(Fwin32_grab, FBorder);
+    if WaitForSingleObject(Fwin32_grab.Mutex, INFINITE) = WAIT_OBJECT_0 then
+    begin
+      showframe := FWin32_grab.CaptureForm.ShowFrame;
+    end;
+    ReleaseMutex(Fwin32_grab.Mutex);
+
     if showframe <> 0 then
-      Show
+      Visible := True
     else
-      Hide;
-    if (Left <> R.Left) or (Top <> R.Top) then
-      SetWindowPos(Handle, HWND_TOPMOST, R.Left, R.Top, fwidth, fheight,
+      Visible := False;
+    if (Left <> P.X) or (Top <> P.Y) then
+      SetWindowPos(Handle, HWND_TOPMOST, P.X, P.Y, Width, Height,
         SWP_NOSIZE or SWP_NOACTIVATE)
     else
       SetWindowPos(Handle, HWND_TOPMOST, 0, 0, 0, 0,
@@ -506,7 +472,7 @@ var
   dim: TRect;
 
   window_handle: HWND;
-  fwidth, fheight, ftop, fleft: Integer;
+  ftop, fleft: Integer;
   show_frame: Integer;
   Mem_bmp: BITMAP;
 begin
@@ -522,6 +488,7 @@ begin
   // filename format: <option1>=<param1>;<option2>=<param2>;...
   //  point_captureform=int: Point of TCaptureForm
   //  framerate=int/int: Numerator/Denominator, e.g. 30000/1001 (-> 29.97)
+  //  framesize=int,int: width and height
   //  client=1: capture client dc instead of window dc
   //  cursor=1: grab cursor
   //  parentguid=string of guid, unique Object
@@ -541,6 +508,13 @@ begin
       ap.time_base.den := StrToInt(N);
       ap.time_base.num := StrToInt(V);
     end
+    else if SameText(N, 'framesize') then
+      begin
+        // framesize=w,h
+        N := Fetch(V, ',');
+        width := StrToInt(N);
+        height := StrToInt(V);
+      end
     else if SameText(N, 'client') then
       // capture client dc instead of window dc
       ctx.client := StrToIntDef(V, 1)
@@ -557,8 +531,6 @@ begin
   if WaitForSingleObject(ctx.Mutex, INFINITE) = WAIT_OBJECT_0 then
   begin
     window_handle := ctx.CaptureForm.Handle;
-    width := ctx.CaptureForm.Width;
-    height := ctx.CaptureForm.Height;
     show_frame := ctx.CaptureForm.ShowFrame;
   end;
   ReleaseMutex(ctx.Mutex);
@@ -575,42 +547,35 @@ begin
   end;
   ctx.old_Hwnd := window_handle;
 
-  screenwidth := GetDeviceCaps(GetDC(0), HORZRES);
-  screenheight := GetDeviceCaps(GetDC(0), VERTRES);
+  screenwidth := GetDeviceCaps(ctx.source_hdc, HORZRES);
+  screenheight := GetDeviceCaps(ctx.source_hdc, VERTRES);
   if window_handle <> 0 then
   begin
     if ctx.client <> 0 then
       GetClientRect(window_handle, dim)
     else
       GetWindowRect(window_handle, dim);
-    fwidth := dim.right - dim.left;
-    fheight := dim.bottom - dim.top;
+    ctx.width := dim.right - dim.left;
+    ctx.height := dim.bottom - dim.top;
   end
   else
   begin
-    fwidth := screenwidth;
-    fheight := screenheight;
+    ctx.width := screenwidth;
+    ctx.height := screenheight;
   end;
-  if (width > 0) and (width <> fwidth) then
-    fwidth := width;
-  if (height > 0) and (height <> fheight) then
-    fheight := height;
+  if (width > 0) and (width <> ctx.width) then
+    ctx.width := width;
+  if (height > 0) and (height <> ctx.height) then
+    ctx.height := height;
 
-  if fleft + fwidth > screenwidth then
-    fwidth := screenwidth - fleft;
-  if ftop + fheight > screenheight then
-    fheight := screenheight - ftop;
-
-  if WaitForSingleObject(ctx.Mutex, INFINITE) = WAIT_OBJECT_0 then
-  begin
-    ctx.CaptureForm.Width := fwidth;
-    ctx.CaptureForm.Height := fheight;
-  end;
-  ReleaseMutex(ctx.Mutex);
+  if fleft + ctx.width > screenwidth then
+    ctx.width := screenwidth - fleft;
+  if ftop + ctx.height > screenheight then
+    ctx.height := screenheight - ftop;
 
   ctx.bpp := GetDeviceCaps(ctx.source_hdc, BITSPIXEL);
 
-  if (fwidth < 0) or (fheight < 0) or (ctx.bpp mod 8 <> 0) then
+  if (ctx.width < 0) or (ctx.height < 0) or (ctx.bpp mod 8 <> 0) then
   begin
     WriteLog(GetCurrentThreadId, ctx.ParentGUID, llerror, 'Invalid properties, aborting'#10);
     Result := AVERROR_IO;
@@ -695,7 +660,7 @@ begin
     Exit;
   end;
 //  ctx.size := bmp.bmWidthBytes * bmp.bmHeight * bmp.bmPlanes;
-  ctx.size := (fwidth * ctx.bpp div 8) * fheight * 1;
+  ctx.size := (ctx.width * ctx.bpp div 8) * ctx.height * 1;
 
   st := av_new_stream(s, 0);
   if st = nil then
@@ -721,8 +686,8 @@ begin
 
   st.codec.codec_type := AVMEDIA_TYPE_VIDEO;
   st.codec.codec_id   := CODEC_ID_RAWVIDEO;
-  st.codec.width      := fwidth;
-  st.codec.height     := fheight;
+  st.codec.width      := ctx.width;
+  st.codec.height     := ctx.height;
   st.codec.pix_fmt    := input_pixfmt;
   st.codec.time_base  := ap.time_base;
   st.codec.bit_rate   := Round(ctx.size * 1 / av_q2d(ap.time_base) * 8);
@@ -743,7 +708,7 @@ begin
 
   if show_title then
     WriteLog(GetCurrentThreadId, ctx.ParentGUID, llInfo, Format('Found window %s, ', [title]));
-  WriteLog(GetCurrentThreadId, ctx.ParentGUID, llInfo, Format('ready for capturing %ux%ux%u at (%u,%u)'#10, [fwidth, fheight, ctx.bpp, fleft, ftop]));
+  WriteLog(GetCurrentThreadId, ctx.ParentGUID, llInfo, Format('ready for capturing %ux%ux%u at (%u,%u)'#10, [ctx.width, ctx.height, ctx.bpp, fleft, ftop]));
 
   Result := 0;
 end;

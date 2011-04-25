@@ -85,7 +85,7 @@ type
     function  ReadProgressIntegerval: Integer;
 
     procedure InitFCaptureForm;     //初始化FCaptureForm
-    procedure SetCpForm(Hwnd: HWND;Left, Top, Width, Height: Integer; GrabMode: TGrabMode; ShowFrame: Integer);  //设置FCaptureForm
+    procedure SetCpForm(Hwnd: HWND;Left, Top: Integer; GrabMode: TGrabMode; ShowFrame: Integer);  //设置FCaptureForm
     function  ReadFCaptureForm: TCaptureForm; //从FSCaptureForm同步FCaptureForm然后传给外部。
     procedure SynToShared;    //将FCaptureForm同步到FSCaptureForm
     procedure SynFromShared;  //从FSCaptureForm同步FCaptureForm
@@ -126,7 +126,7 @@ type
     procedure  UseDefaultOO;
 
     procedure  ResetHandle(NewHwnd: HWND);
-    procedure  ResetRect(Left, Top, Width, Height: Integer);
+    procedure  ResetOffset(x_off, y_off: Integer);
     procedure  ResetGrabMode(NewGrabMode: TGrabMode);
     procedure  ResetShowFrame(ShowFrame: Integer);
   end;
@@ -265,8 +265,6 @@ begin
     Handle := 0;
     Left := 0;
     Top := 0;
-    Width := 0;
-    Height := 0;
     GrabMode := gmDC;
     ShowFrame := 1;
   end;
@@ -302,9 +300,10 @@ var
   st: string;
 begin
   FOptionCaptions := '';
-  SetCpForm(VIO.Handle,VIO.x_off,VIO.y_off,VIO.Width,VIO.Height,VIO.GrabMode,VIO.ShowFrame);
+  SetCpForm(VIO.Handle,VIO.x_off,VIO.y_off,VIO.GrabMode,VIO.ShowFrame);
   SynToShared;
   st := 'framerate=' + VIO.FrameRate + ';';
+  st := 'framesize=' + IntToStr(VIO.Width) + ',' + IntToStr(VIO.Height) + ';';
   st := st + 'client=' + IntToStr(VIO.Client) + ';';
   st := st + 'cursor=' + IntToStr(VIO.Cursor) + ';';
   st := st + 'parentguid=' + FID + ';';
@@ -313,13 +312,11 @@ begin
   FOptionCaptions := st;
 end;
 
-procedure TScreenCapture.SetCpForm(Hwnd: HWND;Left, Top, Width, Height: Integer; GrabMode: TGrabMode; ShowFrame: Integer);
+procedure TScreenCapture.SetCpForm(Hwnd: HWND;Left, Top: Integer; GrabMode: TGrabMode; ShowFrame: Integer);
 begin
   FCaptureForm.Handle := Hwnd;
   FCaptureForm.Left := Left;
   FCaptureForm.Top := Top;
-  FCaptureForm.Width := Width;
-  FCaptureForm.Height := Height;
   FCaptureForm.GrabMode := GrabMode;
   FCaptureForm.ShowFrame := ShowFrame;
 end;
@@ -458,12 +455,10 @@ begin
   SynToShared;
 end;
 
-procedure TScreenCapture.ResetRect(Left, Top, Width, Height: Integer);
+procedure TScreenCapture.ResetOffset(x_off, y_off: Integer);
 begin
-  FCaptureForm.Left := Left;
-  FCaptureForm.Top := Top;
-  FCaptureForm.Width := Width;
-  FCaptureForm.Height := Height;
+  FCaptureForm.Left := x_off;
+  FCaptureForm.Top := y_off;
   SynToShared;
 end;
 

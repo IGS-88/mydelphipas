@@ -32,6 +32,7 @@ type
     edt5: TEdit;
     btn9: TButton;
     btn10: TButton;
+    btn11: TButton;
     procedure FormCreate(Sender: TObject);
     procedure btn1Click(Sender: TObject);
     procedure btn3Click(Sender: TObject);
@@ -44,6 +45,7 @@ type
     procedure btn8Click(Sender: TObject);
     procedure btn9Click(Sender: TObject);
     procedure btn10Click(Sender: TObject);
+    procedure btn11Click(Sender: TObject);
   private
     { Private declarations }
     s: TTerminateInfo;
@@ -225,9 +227,21 @@ end;
 
 procedure TForm1.btn10Click(Sender: TObject);
 begin
-//  ScreenCapture1.ResetHandle(StrToInt(Edit1.Text));
-//  ScreenCapture1.ResetGrabMode(gmPW);
-  ScreenCapture1.ResetHandle(StrToInt(Edit1.text));
+  ScreenCapture1.ResetHandle(StrToInt(Edit1.Text));
+end;
+
+procedure TForm1.btn11Click(Sender: TObject);
+begin
+  if btn11.Caption = 'HideFrame' then
+  begin
+    ScreenCapture1.ResetShowFrame(0);
+    btn11.Caption := 'ShowFrame';
+  end
+  else
+  begin
+    ScreenCapture1.ResetShowFrame(1);
+    btn11.Caption := 'HideFrame';
+  end;
 end;
 
 end.

@@ -10,7 +10,6 @@ type
   TCaptureForm = record
     Handle: HWND;
     Left, Top: Integer;
-    Width, Height: Integer;
     GrabMode: TGrabMode;
     ShowFrame: Integer;
   end;
