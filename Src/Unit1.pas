@@ -57,8 +57,8 @@ type
 
 var
   Form1: TForm1;
-  ScreenCapture1: TScreenCapture;
-  ScreenCapture2: TScreenCapture;
+  ScreenCapture1: TCapture;
+  ScreenCapture2: TCapture;
   TargetPID: Cardinal= 0;
 
   VIO: TVideoInputOption;
@@ -71,19 +71,21 @@ implementation
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   DoubleBuffered := True;
-  ScreenCapture1 := TScreenCapture.Create(Self);
+  ScreenCapture1 := TCapture.Create(Self);
 //  ScreenCapture1.OnError := OnError;
   ScreenCapture1.OnPreviewBitmap := OnPreviewBitmap;
   mmo1.Lines.Add('Create ScreenCapture');
   SetOnLogEvent(OnLog);
 //  Edit1.Text := 'offset=0,0;framesize=500,500;framerate=15/1;showframe=1;cursor=1;grabmode=1;';
   Edit1.Text := '1443066';
-  edt2.Text := '百度与作家团体关键问题仍对峙 110328 北京您早 - 视频 - 优酷视频 - 在线观看 - Windows Internet Explorer';
+  //edt2.Text := '百度与作家团体关键问题仍对峙 110328 北京您早 - 视频 - 优酷视频 - 在线观看 - Windows Internet Explorer';
 
   CreateAudioTasks();
 end;
 
 procedure TForm1.btn1Click(Sender: TObject);
+var
+  AIO : TAudioInputOption;
 begin
   ScreenCapture1.PreviewBitmap := True;
   ScreenCapture1.ProgressInterval := 100;
@@ -94,7 +96,9 @@ begin
   VIO.Width := 500;
   VIO.ShowFrame := 1;
   VIO.Cursor := 1;
-  ScreenCapture1.SetCaptureOptions(VIO);
+  AIO := ScreenCapture1.AskAudioFormat(StrToInt(edt2.Text));
+
+  ScreenCapture1.SetCaptureOptions(VIO, AIO);
   ScreenCapture1.UseDefaultOO;
   if not ScreenCapture1.Start('ScreenCapture1.mp4') then
   ShowMessage('Error');
@@ -178,7 +182,7 @@ end;
 
 procedure TForm1.btn7Click(Sender: TObject);
 begin
-  ScreenCapture2 := TScreenCapture.Create(Self);
+  ScreenCapture2 := TCapture.Create(Self);
 //  ScreenCapture2.SetCaptureOptions(Edit1.Text);
   InitVideoInputOption(@VIO);
   VIO.Handle := StrToInt(Edit1.Text);
@@ -187,7 +191,7 @@ begin
   VIO.ShowFrame := 1;
   VIO.Cursor := 1;
   VIO.GrabMode := TGrabMode(1);
-  ScreenCapture2.SetCaptureOptions(VIO);
+//  ScreenCapture2.SetCaptureOptions(VIO);
   ScreenCapture2.UseDefaultOO;
   if not ScreenCapture2.Start('ScreenCapture2.mp4') then
   begin

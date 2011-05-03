@@ -25,23 +25,41 @@ type
     GrabMode: TGrabMode;
     FrameRate: string;   // framerate=int/int: Numerator/Denominator, e.g. 30000/1001 (-> 29.97)
   end;
+
+  PAudioInputOption = ^TAudioInputOption;
+  TAudioInputOption = record
+    PID: Cardinal;           //not needed in Web mode
+    sample_rate: Integer;
+    channels: Integer;
+    sample_format: Integer;
+    Voice: Integer;
+  end;
   
-  procedure InitVideoInputOption(VIO: PVideoInputOption);
+  procedure InitVideoInputOption(PVIO: PVideoInputOption);
+  procedure InitAudioInputOption(PAIO: PAudioInputOption);
 
 implementation
-
-procedure InitVideoInputOption(VIO: PVideoInputOption);
+procedure InitAudioInputOption(PAIO: PAudioInputOption);
 begin
-  VIO.Handle := 0;
-  VIO.x_off := 0;
-  VIO.y_off := 0;
-  VIO.Width := 0;
-  VIO.Height := 0;
-  VIO.Client := 0;
-  VIO.Cursor := 0;
-  VIO.ShowFrame := 0;
-  VIO.GrabMode := gmDC;
-  VIO.FrameRate := '15/1';
+  PAIO.PID := 0;
+  PAIO.sample_rate := 44100;
+  PAIO.channels := 2;
+  PAIO.sample_format := 16;
+  PAIO.Voice := 1;
+end;
+
+procedure InitVideoInputOption(PVIO: PVideoInputOption);
+begin
+  PVIO.Handle := 0;
+  PVIO.x_off := 0;
+  PVIO.y_off := 0;
+  PVIO.Width := 0;
+  PVIO.Height := 0;
+  PVIO.Client := 0;
+  PVIO.Cursor := 0;
+  PVIO.ShowFrame := 0;
+  PVIO.GrabMode := gmDC;
+  PVIO.FrameRate := '15/1';
 end;
 
 end.
