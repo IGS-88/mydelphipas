@@ -1,8 +1,8 @@
-unit uCapture;
+unit uWebCapture;
 
 interface
 uses
-  Windows, SysUtils, Classes, MyUtils, uScreenCapture, ProcessWaveCapture, FFEncode, uGUID, uLogger, uCaptureTypes;
+  Windows, SysUtils, Classes, MyUtils, uScreenCapture, webProcessWaveCapture, FFEncode, uGUID, uLogger, uCaptureTypes;
 type
   {PProgressInfo = ^TProgressInfo;
   TProgressInfo = record
@@ -44,7 +44,7 @@ type
 
   TCaptureStatus = (csStopped, csWorking, csPaused);
 
-  TCapture = class(TObject)
+  TWebCapture = class(TObject)
   private
     { FFEncoder referenced }
     FLibAVPath: string;       //DLLs path
@@ -55,11 +55,9 @@ type
     FAO: TInputOptions;       //音频录制的IO
     FEncode: TFFEncoder;
     FStatus: TCaptureStatus;     //FEncode的工作状态
-    FLoadAudioDll: Boolean;       //是否加载了AudioDll
     FScreenOption: String;       //录屏参数设置
 
     FAudioOption: string;        //声音录制参数设置
-    FAudioPID: Cardinal;         //声音录制的PID
     FMute: Boolean;              //是否静默录制
     FWavePauseFlag: Integer;     //声音暂停标志位 1为暂停，0为录制
 
@@ -97,7 +95,6 @@ type
     procedure SynToShared;    //将FCaptureForm同步到FSCaptureForm
     procedure SynFromShared;  //从FSCaptureForm同步FCaptureForm
 
-    procedure InjectAudioDll; //注入录音Dll
   protected
     //
   public
@@ -135,7 +132,7 @@ type
     procedure  UseDefaultOO;
 
     procedure  SetVoice(Mute: Boolean);
-    function   AskAudioFormat(PID: Integer): TAudioInputOption;
+    function   AskAudioFormat: TAudioInputOption;
 
     procedure  ResetHandle(NewHwnd: HWND);
     procedure  ResetOffset(x_off, y_off: Integer);
@@ -147,7 +144,7 @@ implementation
 
 { TScreenCapture }
 
-constructor TCapture.Create;
+constructor TWebCapture.Create;
 begin
   FLibAVPath := ExePath + 'LibAV';
   FID := GetGUID;
@@ -156,7 +153,6 @@ begin
   FGrabMode := gmDC;
   FWavePauseFlag := 0;
   FMute := False;
-  FLoadAudioDll := False;
   InitFCaptureForm;
 
   FOnAudioHook := nil;
@@ -191,7 +187,7 @@ begin
   FStatus := csStopped;
 end;
 
-destructor TCapture.Destroy;
+destructor TWebCapture.Destroy;
 begin
   if FStatus <> csStopped then
   begin
@@ -202,7 +198,7 @@ begin
   inherited;
 end;
 
-procedure TCapture.DoAudioHook(Sender: TObject; ATaskIndex: Integer;
+procedure TWebCapture.DoAudioHook(Sender: TObject; ATaskIndex: Integer;
   const APTS: Int64; ASample: PByte; ASize, ASampleRate,
   AChannels: Integer; ASampleFormat: TSampleFormat);
 begin
@@ -212,7 +208,7 @@ begin
   end;
 end;
 
-procedure TCapture.DoError(ErrorMsg: string);
+procedure TWebCapture.DoError(ErrorMsg: string);
 begin
   FLastError := ErrorMsg;
 //  if Assigned(FOnError) then
@@ -222,7 +218,7 @@ begin
   WriteLog(GetCurrentThreadId, Self.ID, llerror, ErrorMsg+#10);
 end;
 
-procedure TCapture.DoPreviewBitmap(Sender: TObject;
+procedure TWebCapture.DoPreviewBitmap(Sender: TObject;
   const APreviewInfo: TPreviewInfo);
 begin
   if Assigned(FOnPreviewBitmap) then
@@ -231,7 +227,7 @@ begin
   end;
 end;
 
-procedure TCapture.DoProgress(Sender: TObject;
+procedure TWebCapture.DoProgress(Sender: TObject;
   AProgressInfo: PProgressInfo);
 begin
   if Assigned(FOnProgress) then
@@ -240,7 +236,7 @@ begin
   end;
 end;
 
-procedure TCapture.DoTerminate(Sender: TObject;
+procedure TWebCapture.DoTerminate(Sender: TObject;
   const ATerminateInfo: TTerminateInfo);
 begin
   if Assigned(FOnTerminate) then
@@ -249,7 +245,7 @@ begin
   end;
 end;
 
-procedure TCapture.DoVieoInputHook(Sender: TObject;
+procedure TWebCapture.DoVieoInputHook(Sender: TObject;
   AHookInfo: PHookInfo);
 begin
   if Assigned(FOnInputVideoHook) then
@@ -258,7 +254,7 @@ begin
   end;
 end;
 
-procedure TCapture.DoVieoOutputHook(Sender: TObject;
+procedure TWebCapture.DoVieoOutputHook(Sender: TObject;
   AHookInfo: PHookInfo);
 begin
   if Assigned(FOnOutputVideoHook) then
@@ -267,13 +263,13 @@ begin
   end;
 end;
 
-function TCapture.ReadFCaptureForm: TCaptureForm;
+function TWebCapture.ReadFCaptureForm: TCaptureForm;
 begin
   SynFromShared;
   Result := FCaptureForm;
 end;
 
-procedure TCapture.InitFCaptureForm;
+procedure TWebCapture.InitFCaptureForm;
 begin
   with FCaptureForm do
   begin
@@ -286,7 +282,7 @@ begin
   FSCaptureForm := FCaptureForm;
 end;
 
-procedure TCapture.Pause;
+procedure TWebCapture.Pause;
 begin
   FEncode.Pause;
   FWavePauseFlag := 1;
@@ -294,17 +290,17 @@ begin
   WriteLog(GetCurrentThreadId, ID, llDebug, 'Capture Paused!'#10);
 end;
 
-function TCapture.ReadPreviewBitmap: Boolean;
+function TWebCapture.ReadPreviewBitmap: Boolean;
 begin
   Result := FEncode.PreviewBitmap;
 end;
 
-function TCapture.ReadProgressIntegerval: Integer;
+function TWebCapture.ReadProgressIntegerval: Integer;
 begin
   Result := FEncode.ProgressInterval;
 end;
 
-procedure TCapture.Resume;
+procedure TWebCapture.Resume;
 begin
   FEncode.Resume;
   FWavePauseFlag := 0;
@@ -312,7 +308,7 @@ begin
   WriteLog(GetCurrentThreadId, ID, llDebug, 'Capture Resume!'#10);
 end;
 
-procedure TCapture.SetCaptureOptions(VIO: TVideoInputOption; AIO: TAudioInputOption);
+procedure TWebCapture.SetCaptureOptions(VIO: TVideoInputOption; AIO: TAudioInputOption);
 var
   st: string;
 begin
@@ -330,15 +326,10 @@ begin
 
   FAudioOption := '';
   FAudioOption := 'r=' + IntToStr(AIO.sample_rate) + ';c=' + IntToStr(AIO.channels) + ';f=' + IntToStr(AIO.sample_format) +
-                  ';voice=' + IntToStr(AIO.Voice) + ';pid=' + IntToStr(AIO.PID) + ';pause_pointer=' + IntToStr(Integer(@FWavePauseFlag));
-  FAudioPID := AIO.PID;
-  if AIO.Voice = 0 then
-    FMute := True
-  else
-    FMute := False;
+                  ';voice=' + IntToStr(AIO.Voice) + ';pause_pointer=' + IntToStr(Integer(@FWavePauseFlag));
 end;
 
-procedure TCapture.SetCpForm(Hwnd: HWND;Left, Top: Integer; GrabMode: TGrabMode; ShowFrame: Integer);
+procedure TWebCapture.SetCpForm(Hwnd: HWND;Left, Top: Integer; GrabMode: TGrabMode; ShowFrame: Integer);
 begin
   FCaptureForm.Handle := Hwnd;
   FCaptureForm.Left := Left;
@@ -347,25 +338,25 @@ begin
   FCaptureForm.ShowFrame := ShowFrame;
 end;
 
-function TCapture.SetOutputOptins: Boolean;
+function TWebCapture.SetOutputOptins: Boolean;
 begin
   { TODO : 初始化并设置 TOutputOption  FOO }
   Result := True;
 end;
 
-procedure TCapture.SetPreviewBitmap(Value: Boolean);
+procedure TWebCapture.SetPreviewBitmap(Value: Boolean);
 begin
   FEncode.Preview := Value;
   FEncode.PreviewBitmap := Value;
 end;
 
-procedure TCapture.SetProgressIntegerval(Value: Integer);
+procedure TWebCapture.SetProgressIntegerval(Value: Integer);
 begin
   FEncode.ProgressInterval := Value;
   WriteLog(GetCurrentThreadId, ID, llDebug, 'Set ProgressIntegerval = '+ IntToStr(Value)+#10);
 end;
 
-function TCapture.Start(OutPutFile: WideString): Boolean;
+function TWebCapture.Start(OutPutFile: WideString): Boolean;
 begin
   Result := False;
   if FStatus = csWorking then
@@ -398,11 +389,8 @@ begin
     WriteLog(GetCurrentThreadId, ID, llDebug, 'Load AVLib, Path: '+ FLibAVPath);
     // register screen capture demuxer
     uScreenCapture.register_screencapture;
-    ProcessWaveCapture.register_processwavecapture;
+    webProcessWaveCapture.register_webprocesswavecapture;
   end;
-
-  if not FLoadAudioDll then
-  InjectAudioDll;
 
   if FScreenOption = EmptyStr then
   begin
@@ -430,7 +418,7 @@ begin
   end;
 
   InitInputOptions(@FAO);
-  FAO.ForceFormat := 'processwavecapture';
+  FAO.ForceFormat := 'webprocesswavecapture';
   FWavePauseFlag := 0;
 
   if not FEncode.AddInputFile(LIndex, FAudioOption, @FAO) then
@@ -452,14 +440,14 @@ begin
   WriteLog(GetCurrentThreadId, ID, llDebug, 'Capture Start!'#10);
 end;
 
-procedure TCapture.Stop;
+procedure TWebCapture.Stop;
 begin
   FEncode.Stop;
   FStatus := csStopped;
   WriteLog(GetCurrentThreadId, ID, llDebug, 'Capture Stopped!'#10);
 end;
 
-procedure TCapture.SynToShared;
+procedure TWebCapture.SynToShared;
 begin
   if WaitForSingleObject(FMutex, INFINITE) = WAIT_OBJECT_0 then
   begin
@@ -468,14 +456,14 @@ begin
   ReleaseMutex(FMutex);
 end;
 
-procedure TCapture.UseDefaultOO;
+procedure TWebCapture.UseDefaultOO;
 begin
   InitOutputOptions(@FOO);
   FOO.VideoCodec := 'mpeg4';
   WriteLog(GetCurrentThreadId, ID, llDebug, 'Use Default OutputOptions.'#10);
 end;
 
-procedure TCapture.SynFromShared;
+procedure TWebCapture.SynFromShared;
 begin
   if WaitForSingleObject(FMutex, INFINITE) = WAIT_OBJECT_0 then
   begin
@@ -484,40 +472,37 @@ begin
   ReleaseMutex(FMutex);
 end;
 
-procedure TCapture.ResetGrabMode(NewGrabMode: TGrabMode);
+procedure TWebCapture.ResetGrabMode(NewGrabMode: TGrabMode);
 begin
   FCaptureForm.GrabMode := NewGrabMode;
   SynToShared;
 end;
 
-procedure TCapture.ResetHandle(NewHwnd: HWND);
+procedure TWebCapture.ResetHandle(NewHwnd: HWND);
 begin
   FCaptureForm.Handle := NewHwnd;
   SynToShared;
 end;
 
-procedure TCapture.ResetOffset(x_off, y_off: Integer);
+procedure TWebCapture.ResetOffset(x_off, y_off: Integer);
 begin
   FCaptureForm.Left := x_off;
   FCaptureForm.Top := y_off;
   SynToShared;
 end;
 
-procedure TCapture.ResetShowFrame(ShowFrame: Integer);
+procedure TWebCapture.ResetShowFrame(ShowFrame: Integer);
 begin
   FCaptureForm.ShowFrame := ShowFrame;
   SynToShared;
 end;
 
-function TCapture.AskAudioFormat(PID: Integer): TAudioInputOption;
+function TWebCapture.AskAudioFormat: TAudioInputOption;
 var
   param: string;
   N, V: string;
 begin
-  if not FLoadAudioDll then
-  InjectAudioDll;
-
-  param := ProcessWaveCapture.AskFormat(PID);
+  param := webProcessWaveCapture.AskFormat;
   if param = EmptyStr then
   begin
     DoError('Get Audio Format Failed!');
@@ -542,35 +527,23 @@ begin
     Result.Voice := 0
   else
     Result.Voice := 1;
-
-  Result.PID := PID;
 end;
 
-procedure TCapture.SetVoice(Mute: Boolean);
+procedure TWebCapture.SetVoice(Mute: Boolean);
 begin
   if Mute then
   begin
-    ProcessWaveCapture.SendVoice(FAudioPID, False);
+    webProcessWaveCapture.SendVoice(False);
     WriteLog(GetCurrentThreadId, FID, llInfo, 'Mute, now voice off.');
   end
   else
   begin
-    ProcessWaveCapture.SendVoice(FAudioPID, True);
+    webProcessWaveCapture.SendVoice(True);
     WriteLog(GetCurrentThreadId, FID, llInfo, 'Voice, now voice on.');
   end;
 
   FMute := Mute;
 end;
 
-procedure TCapture.InjectAudioDll;
-begin
-  if not ProcessWaveCapture.InjectTargetPid(FAudioPID) then
-  begin
-    DoError('InjectDll Failed');
-    FLoadAudioDll := False;
-    Exit;
-  end;
-  FLoadAudioDll := True;
-end;
 
 end.
