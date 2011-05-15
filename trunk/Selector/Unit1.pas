@@ -34,6 +34,9 @@ implementation
 procedure TForm1.btn1Click(Sender: TObject);
 begin
   b := TSelector.Create(Self);
+//  b.Parent := Self;
+  b.SetLimitHWND(Handle);
+  b.SetLimitSize(Point(100,100),Point(500,500));
   b.Show;
 end;
 
